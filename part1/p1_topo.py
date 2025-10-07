@@ -3,8 +3,13 @@ from mininet.net import Mininet
 from mininet.log import setLogLevel, info
 from mininet.cli import CLI
 from mininet.node import RemoteController, OVSSwitch
+from mininet.clean import cleanup
 
 class CustomTopo(Topo):
+    """
+    Custom topology for Part 1: 2 switches, 4 hosts.
+    h1, h2 --- s1 --- s2 --- h3, h4
+    """
     def build(self):
         # Add two switches
         s1 = self.addSwitch('s1')
@@ -24,27 +29,34 @@ class CustomTopo(Topo):
         self.addLink(h3, s2)
         self.addLink(h4, s2)
 
-        # Optionally, add a link between the two switches
+        # Connect the two switches
         self.addLink(s1, s2)
 
 def run():
-    """Create the network, start it, and enter the CLI."""
+    """Create and start the network."""
     topo = CustomTopo()
-    net = Mininet(topo=topo, switch=OVSSwitch, build=False, controller=None,
-              autoSetMacs=True, autoStaticArp=True)
-    net.addController('c0', controller=RemoteController, ip="127.0.0.1", protocol='tcp', port=6633)
-    net.build()
+
+    # Create the network and specify the external controller.
+    # This configuration prevents Mininet from starting its own internal controller.
+    net = Mininet(topo=topo,
+                  switch=OVSSwitch,
+                  controller=RemoteController, # Use the RemoteController class
+                  autoSetMacs=True,
+                  autoStaticArp=True,
+                  build=False) # build=False is good practice before starting
+
+    info('*** Starting network\n')
     net.start()
+
     info('*** Running CLI\n')
     CLI(net)
-
 
     info('*** Stopping network\n')
     net.stop()
 
-# Example command to run: sudo python3 part1/p1_topo.py
 if __name__ == '__main__':
-    # Set log level to display Mininet output
+    # It's good practice to clean up previous Mininet runs before starting
+    cleanup()
     setLogLevel('info')
     run()
 
