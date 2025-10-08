@@ -56,7 +56,7 @@ def run():
 
 if __name__ == '__main__':
     # It's good practice to clean up previous Mininet runs before starting
-    cleanup()
+    # cleanup()
     setLogLevel('info')
     run()
 
