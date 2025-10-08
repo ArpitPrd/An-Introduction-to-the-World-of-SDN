@@ -7,7 +7,7 @@ from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet
 from ryu.lib.packet import ether_types
 
-class SimpleHub(app_manager.RyuApp):
+class LearningController(app_manager.RyuApp):
     """
     A simple Hub controller for Part 1 of the assignment.
     This controller learns MAC addresses but never installs flow rules.
@@ -16,7 +16,7 @@ class SimpleHub(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
 
     def __init__(self, *args, **kwargs):
-        super(SimpleHub, self).__init__(*args, **kwargs)
+        super(LearningController, self).__init__(*args, **kwargs)
         self.mac_to_port = {}
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
@@ -82,6 +82,13 @@ class SimpleHub(app_manager.RyuApp):
             out_port = ofproto.OFPP_FLOOD
 
         actions = [parser.OFPActionOutput(out_port)]
+
+        if out_port != ofproto.OFPP_FLOOD:
+
+            match = parser.OFPMatch(in_port=in_port, eth_src=src, eth_dst=dst)
+            self.add_flow(datapath, 1, match, actions)
+
+            self.logger.info(f"Controller Installed Flow Rule for {src} to {dst}")
 
         # Construct and send the PacketOut message
         out = parser.OFPPacketOut(datapath=datapath,
