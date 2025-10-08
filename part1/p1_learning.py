@@ -88,7 +88,7 @@ class LearningController(app_manager.RyuApp):
             match = parser.OFPMatch(in_port=in_port, eth_src=src, eth_dst=dst)
             self.add_flow(datapath, 1, match, actions)
 
-            self.logger.info(f"Controller Installed Flow Rule for {src} to {dst}")
+            self.logger.info(f"For Switch {dpid} Controller Installed Flow Rule for {src} to {dst}")
 
         # Construct and send the PacketOut message
         out = parser.OFPPacketOut(datapath=datapath,
