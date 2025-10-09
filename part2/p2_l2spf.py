@@ -86,7 +86,9 @@ class L2SPF(app_manager.RyuApp):
         pkt = packet.Packet(msg.data)
         eth = pkt.get_protocol(ethernet.ethernet)
 
+        # *** ADDED DEBUGGING FOR LLDP ***
         if eth.ethertype == ether_types.ETH_TYPE_LLDP:
+            self.logger.info("LLDP packet received, ignoring.")
             return
 
         dst = eth.dst
@@ -95,7 +97,6 @@ class L2SPF(app_manager.RyuApp):
 
         self.mac_to_port[src] = (src_switch_id, in_port)
 
-        # *** NEW ARP HANDLING LOGIC ***
         # Handle ARP packets specifically to ensure host discovery works reliably.
         arp_pkt = pkt.get_protocol(arp.arp)
         if arp_pkt:
@@ -142,7 +143,7 @@ class L2SPF(app_manager.RyuApp):
                 self.flood_packet(datapath, msg)
         
         else:
-            # self.logger.info("Destination %s unknown. Flooding packet.", dst)
+            self.logger.info("Destination %s unknown. Flooding packet.", dst)
             self.flood_packet(datapath, msg)
 
     def flood_packet(self, datapath, msg):
