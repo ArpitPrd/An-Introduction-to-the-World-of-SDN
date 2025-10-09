@@ -142,7 +142,7 @@ class L2SPF(app_manager.RyuApp):
                 self.flood_packet(datapath, msg)
         
         else:
-            self.logger.info("Destination %s unknown. Flooding packet.", dst)
+            # self.logger.info("Destination %s unknown. Flooding packet.", dst)
             self.flood_packet(datapath, msg)
 
     def flood_packet(self, datapath, msg):
