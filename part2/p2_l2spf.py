@@ -8,14 +8,21 @@ from ryu.ofproto import ofproto_v1_3
 from ryu.lib.packet import packet, ethernet, ether_types, arp
 from ryu.topology import event
 from ryu.topology.api import get_switch
+# **STEP 1: Import the Switches class**
+from ryu.topology.switches import Switches
 
 import networkx as nx
 
 class L2SPF(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
+    # **STEP 2: Add the _CONTEXTS dictionary to declare dependency**
+    _CONTEXTS = {'switches': Switches}
 
     def __init__(self, *args, **kwargs):
         super(L2SPF, self).__init__(*args, **kwargs)
+        # **STEP 3: Get the switches instance from the context**
+        self.switches = kwargs['switches']
+        
         self.mac_to_port = {}
         
         try:
@@ -40,27 +47,27 @@ class L2SPF(app_manager.RyuApp):
         self.add_flow(datapath, 0, match, actions)
         self.logger.info("Switch %s connected.", datapath.id)
 
-    @set_ev_cls(event.EventSwitchEnter)
-    def handler_switch_enter(self, ev):
-        dpid = ev.switch.dp.id
-        self.graph.add_node(dpid)
-        self.logger.info("Added Switch %s to the network graph.", dpid)
-
+    # Note: EventSwitchEnter is no longer needed as we get switch data from EventLinkAdd
+    
     @set_ev_cls(event.EventLinkAdd)
     def handle_link_add(self, ev):
-        src_id = ev.link.src.dpid
-        dst_id = ev.link.dst.dpid
+        src_dpid = ev.link.src.dpid
+        dst_dpid = ev.link.dst.dpid
         src_port = ev.link.src.port_no
         dst_port = ev.link.dst.port_no
 
-        if self.weight_matrix and max(src_id, dst_id) <= len(self.weight_matrix):
-            edge_cost = self.weight_matrix[src_id - 1][dst_id - 1]
+        # Add nodes if they don't already exist
+        self.graph.add_node(src_dpid)
+        self.graph.add_node(dst_dpid)
+
+        if self.weight_matrix and max(src_dpid, dst_dpid) <= len(self.weight_matrix):
+            edge_cost = self.weight_matrix[src_dpid - 1][dst_dpid - 1]
         else:
-            edge_cost = 1 # Default cost
+            edge_cost = 1 # Default cost if matrix is not configured
         
-        self.graph.add_edge(src_id, dst_id, port=src_port, weight=edge_cost)
-        self.graph.add_edge(dst_id, src_id, port=dst_port, weight=edge_cost)
-        self.logger.info("Added link from %s to %s with cost %s", src_id, dst_id, edge_cost)
+        self.graph.add_edge(src_dpid, dst_dpid, port=src_port, weight=edge_cost)
+        self.graph.add_edge(dst_dpid, src_dpid, port=dst_port, weight=edge_cost)
+        self.logger.info("Added link from %s to %s with cost %s", src_dpid, dst_dpid, edge_cost)
 
     def add_flow(self, datapath, priority, match, actions):
         ofproto = datapath.ofproto
@@ -78,7 +85,7 @@ class L2SPF(app_manager.RyuApp):
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
         msg = ev.msg
-        datapath = msg.datapath
+        datapath = ev.msg.datapath
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
         in_port = msg.match['in_port']
@@ -86,75 +93,73 @@ class L2SPF(app_manager.RyuApp):
         pkt = packet.Packet(msg.data)
         eth = pkt.get_protocol(ethernet.ethernet)
 
-        # *** ADDED DEBUGGING FOR LLDP ***
         if eth.ethertype == ether_types.ETH_TYPE_LLDP:
-            # self.logger.info("LLDP packet received, ignoring.")
             return
 
         dst = eth.dst
         src = eth.src
-        src_switch_id = datapath.id
+        dpid = datapath.id
 
-        self.mac_to_port[src] = (src_switch_id, in_port)
+        self.mac_to_port[src] = (dpid, in_port)
 
-        # Handle ARP packets specifically to ensure host discovery works reliably.
+        # Handle ARP packets specifically
         arp_pkt = pkt.get_protocol(arp.arp)
         if arp_pkt:
-            self.logger.info("ARP packet received. Flooding to ensure discovery.")
+            self.logger.info("ARP packet received from %s. Flooding.", src)
             self.flood_packet(datapath, msg)
             return
 
         if dst in self.mac_to_port:
-            dst_switch_id, dst_out_port = self.mac_to_port[dst]
-
-            if src_switch_id == dst_switch_id:
-                self.logger.info("Both hosts on same switch %s", src_switch_id)
-                actions = [parser.OFPActionOutput(dst_out_port)]
+            dst_dpid, dst_port = self.mac_to_port[dst]
+            
+            if dpid == dst_dpid:
+                actions = [parser.OFPActionOutput(dst_port)]
                 match = parser.OFPMatch(eth_dst=dst)
                 self.add_flow(datapath, 1, match, actions)
                 self.send_packet_out(datapath, msg, actions)
                 return
 
             try:
-                paths = list(nx.all_shortest_paths(self.graph, source=src_switch_id, target=dst_switch_id, weight="weight"))
-                selected_route = self.select_route(paths)
-                self.logger.info("Selected route for %s -> %s: %s", src, dst, selected_route)
+                paths = list(nx.all_shortest_paths(self.graph, source=dpid, target=dst_dpid, weight='weight'))
+                if not paths: raise nx.NetworkXNoPath
+                
+                selected_path = self.select_route(paths)
+                self.logger.info("Selected path for %s -> %s: %s", src, dst, selected_path)
 
-                for i in range(len(selected_route) - 1):
-                    this_switch_dpid = selected_route[i]
-                    next_switch_dpid = selected_route[i+1]
-                    out_port = self.graph[this_switch_dpid][next_switch_dpid]["port"]
-                    this_switch_datapath = get_switch(self, this_switch_dpid)[0].dp
+                # Install rules on all switches in the path
+                for i in range(len(selected_path) - 1):
+                    this_dpid = selected_path[i]
+                    next_dpid = selected_path[i+1]
+                    out_port = self.graph[this_dpid][next_dpid]['port']
+                    
+                    # Use the switches context to get the datapath object
+                    dp = self.switches.dps[this_dpid]
                     actions = [parser.OFPActionOutput(out_port)]
                     match = parser.OFPMatch(eth_dst=dst)
-                    self.add_flow(this_switch_datapath, 1, match, actions)
+                    self.add_flow(dp, 1, match, actions)
 
-                final_switch_datapath = get_switch(self, dst_switch_id)[0].dp
-                actions = [parser.OFPActionOutput(dst_out_port)]
+                # Install the final rule on the destination switch
+                dp = self.switches.dps[dst_dpid]
+                actions = [parser.OFPActionOutput(dst_port)]
                 match = parser.OFPMatch(eth_dst=dst)
-                self.add_flow(final_switch_datapath, 1, match, actions)
+                self.add_flow(dp, 1, match, actions)
 
-                first_hop_port = self.graph[src_switch_id][selected_route[1]]["port"]
-                actions_for_first_packet = [parser.OFPActionOutput(first_hop_port)]
-                self.send_packet_out(datapath, msg, actions_for_first_packet)
+                # Send the initial packet out the first hop
+                first_hop_port = self.graph[dpid][selected_path[1]]['port']
+                self.send_packet_out(datapath, msg, [parser.OFPActionOutput(first_hop_port)])
 
-            except (nx.NetworkXNoPath, KeyError):
-                self.logger.warning("No path from %s to %s. Flooding.", src_switch_id, dst_switch_id)
+            except nx.NetworkXNoPath:
+                self.logger.warning("No path from switch %s to %s. Flooding.", dpid, dst_dpid)
                 self.flood_packet(datapath, msg)
-        
         else:
-            # self.logger.info("Destination %s unknown. Flooding packet.", dst)
             self.flood_packet(datapath, msg)
 
     def flood_packet(self, datapath, msg):
-        """Helper to flood a packet."""
         ofproto = datapath.ofproto
-        parser = datapath.ofproto_parser
         actions = [parser.OFPActionOutput(ofproto.OFPP_FLOOD)]
         self.send_packet_out(datapath, msg, actions)
 
     def send_packet_out(self, datapath, msg, actions):
-        """Helper to send a PacketOut message."""
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
         in_port = msg.match['in_port']
