@@ -1,0 +1,41 @@
+Output for pingall:
+
+Hub
+*** s1 ------------------------------------------------------------------------
+cookie=0x0, duration=154.396s, table=0, n_packets=83, n_bytes=7966, priority=0 actions=CONTROLLER:65535
+*** s2 ------------------------------------------------------------------------
+cookie=0x0, duration=154.407s, table=0, n_packets=83, n_bytes=7966, priority=0 actions=CONTROLLER:65535
+
+Learning
+*** s1 ------------------------------------------------------------------------
+cookie=0x0, duration=6.527s, table=0, n_packets=1, n_bytes=98, priority=1,in_port="s1-eth1",dl_src=00:00:00:00:00:01,dl_dst=00:00:00:00:00:02 actions=output:"s1-eth2"
+cookie=0x0, duration=6.523s, table=0, n_packets=1, n_bytes=98, priority=1,in_port="s1-eth2",dl_src=00:00:00:00:00:02,dl_dst=00:00:00:00:00:01 actions=output:"s1-eth1"
+cookie=0x0, duration=6.514s, table=0, n_packets=1, n_bytes=98, priority=1,in_port="s1-eth1",dl_src=00:00:00:00:00:01,dl_dst=00:00:00:00:00:03 actions=output:"s1-eth3"
+cookie=0x0, duration=6.503s, table=0, n_packets=1, n_bytes=98, priority=1,in_port="s1-eth3",dl_src=00:00:00:00:00:03,dl_dst=00:00:00:00:00:01 actions=output:"s1-eth1"
+cookie=0x0, duration=6.496s, table=0, n_packets=1, n_bytes=98, priority=1,in_port="s1-eth1",dl_src=00:00:00:00:00:01,dl_dst=00:00:00:00:00:04 actions=output:"s1-eth3"
+cookie=0x0, duration=6.488s, table=0, n_packets=1, n_bytes=98, priority=1,in_port="s1-eth3",dl_src=00:00:00:00:00:04,dl_dst=00:00:00:00:00:01 actions=output:"s1-eth1"
+cookie=0x0, duration=6.476s, table=0, n_packets=1, n_bytes=98, priority=1,in_port="s1-eth2",dl_src=00:00:00:00:00:02,dl_dst=00:00:00:00:00:03 actions=output:"s1-eth3"
+cookie=0x0, duration=6.468s, table=0, n_packets=1, n_bytes=98, priority=1,in_port="s1-eth3",dl_src=00:00:00:00:00:03,dl_dst=00:00:00:00:00:02 actions=output:"s1-eth2"
+cookie=0x0, duration=6.462s, table=0, n_packets=1, n_bytes=98, priority=1,in_port="s1-eth2",dl_src=00:00:00:00:00:02,dl_dst=00:00:00:00:00:04 actions=output:"s1-eth3"
+cookie=0x0, duration=6.456s, table=0, n_packets=1, n_bytes=98, priority=1,in_port="s1-eth3",dl_src=00:00:00:00:00:04,dl_dst=00:00:00:00:00:02 actions=output:"s1-eth2"
+cookie=0x0, duration=14.521s, table=0, n_packets=53, n_bytes=5458, priority=0 actions=CONTROLLER:65535
+*** s2 ------------------------------------------------------------------------
+cookie=0x0, duration=6.522s, table=0, n_packets=1, n_bytes=98, priority=1,in_port="s2-eth3",dl_src=00:00:00:00:00:01,dl_dst=00:00:00:00:00:03 actions=output:"s2-eth1"
+cookie=0x0, duration=6.518s, table=0, n_packets=1, n_bytes=98, priority=1,in_port="s2-eth1",dl_src=00:00:00:00:00:03,dl_dst=00:00:00:00:00:01 actions=output:"s2-eth3"
+cookie=0x0, duration=6.505s, table=0, n_packets=1, n_bytes=98, priority=1,in_port="s2-eth3",dl_src=00:00:00:00:00:01,dl_dst=00:00:00:00:00:04 actions=output:"s2-eth2"
+cookie=0x0, duration=6.502s, table=0, n_packets=1, n_bytes=98, priority=1,in_port="s2-eth2",dl_src=00:00:00:00:00:04,dl_dst=00:00:00:00:00:01 actions=output:"s2-eth3"
+cookie=0x0, duration=6.486s, table=0, n_packets=1, n_bytes=98, priority=1,in_port="s2-eth3",dl_src=00:00:00:00:00:02,dl_dst=00:00:00:00:00:03 actions=output:"s2-eth1"
+cookie=0x0, duration=6.483s, table=0, n_packets=1, n_bytes=98, priority=1,in_port="s2-eth1",dl_src=00:00:00:00:00:03,dl_dst=00:00:00:00:00:02 actions=output:"s2-eth3"
+cookie=0x0, duration=6.472s, table=0, n_packets=1, n_bytes=98, priority=1,in_port="s2-eth3",dl_src=00:00:00:00:00:02,dl_dst=00:00:00:00:00:04 actions=output:"s2-eth2"
+cookie=0x0, duration=6.470s, table=0, n_packets=1, n_bytes=98, priority=1,in_port="s2-eth2",dl_src=00:00:00:00:00:04,dl_dst=00:00:00:00:00:02 actions=output:"s2-eth3"
+cookie=0x0, duration=6.452s, table=0, n_packets=1, n_bytes=98, priority=1,in_port="s2-eth1",dl_src=00:00:00:00:00:03,dl_dst=00:00:00:00:00:04 actions=output:"s2-eth2"
+cookie=0x0, duration=6.450s, table=0, n_packets=1, n_bytes=98, priority=1,in_port="s2-eth2",dl_src=00:00:00:00:00:04,dl_dst=00:00:00:00:00:03 actions=output:"s2-eth1"
+cookie=0x0, duration=14.532s, table=0, n_packets=54, n_bytes=5548, priority=0 actions=CONTROLLER:65535
+
+
+Thpt tests
+
+Hub:
+20.3 Mbits/sec
+Learning:
+29.1 Gbits/sec
