@@ -237,7 +237,7 @@ class L2SPF(app_manager.RyuApp):
         # Final hop flow on the destination switch
         dst_dp = self.switches.dps.get(path[-1])
         if dst_dp:
-            self.logger.info(f"Installed at switch: {dst_dp.dpid}")
+            self.logger.info(f"Installed at switch: {dst_dp.id}")
             match = dst_dp.ofproto_parser.OFPMatch(eth_src=src_mac, eth_dst=dst_mac)
             actions = [dst_dp.ofproto_parser.OFPActionOutput(dst_host_port)]
             self.add_flow(dst_dp, 20, match, actions)
