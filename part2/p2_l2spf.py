@@ -149,7 +149,7 @@ class L2SPF(app_manager.RyuApp):
 
         # Learn source MAC
         self.mac_to_port[src] = (src_switch_id, in_port)
-        self.logger.info("Learned MAC %s at switch %s, port %s", src, src_switch_id, in_port)
+        self.logger.debug("Learned MAC %s at switch %s, port %s", src, src_switch_id, in_port)
 
         # Handle ARP
         # arp_pkt = pkt.get_protocol(arp.arp)
