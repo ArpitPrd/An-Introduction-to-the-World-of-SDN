@@ -5,7 +5,7 @@ from ryu.controller import ofp_event
 from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER
 from ryu.controller.handler import set_ev_cls
 from ryu.ofproto import ofproto_v1_3
-from ryu.lib.packet import packet, ethernet, ether_types, arp
+from ryu.lib.packet import packet, ethernet, ether_types
 from ryu.topology import event
 from ryu.topology.switches import Switches
 
@@ -18,9 +18,11 @@ class L2SPF(app_manager.RyuApp):
 
     def __init__(self, *args, **kwargs):
         super(L2SPF, self).__init__(*args, **kwargs)
-        self.switches = kwargs['switches']  # Switches context (holds datapaths)
-        self.mac_to_port = {}               # MAC -> (dpid, port)
+        self.switches = kwargs['switches']
+        self.mac_to_port = {}
+        self.graph = nx.DiGraph()
         self.config = {}
+
         try:
             with open("config.json", 'r') as f:
                 self.config = json.load(f)
@@ -30,43 +32,7 @@ class L2SPF(app_manager.RyuApp):
 
         self.weight_matrix = self.config.get("weight_matrix", [])
         self.ecmp = self.config.get("ecmp", False)
-        self.graph = nx.DiGraph()
         self.logger.info("L2SPF Controller Started. ECMP is %s.", "enabled" if self.ecmp else "disabled")
-
-        # fallback for topology readiness if no weight_matrix present
-        # If weight_matrix present, we'll compute expected directed edges from it.
-        self.EXPECTED_LINKS = 6  # legacy fallback: number of undirected links
-        # note: we intentionally do not hardcode *2 here. is_topology_ready handles directed edges.
-
-    # ---------------------------
-    # Topology readiness helpers
-    # ---------------------------
-    def expected_directed_edges_from_weight_matrix(self):
-        """
-        Count non-zero entries in weight_matrix. Each non-zero (i,j)
-        means a directed edge i->j is expected.
-        """
-        if not self.weight_matrix:
-            return None
-        count = 0
-        for i in range(len(self.weight_matrix)):
-            for j in range(len(self.weight_matrix[i])):
-                if self.weight_matrix[i][j] != 0:
-                    count += 1
-        return count
-
-    def is_topology_ready(self):
-        """
-        Determine if topology is fully discovered.
-        If weight_matrix is provided, use it to determine the expected directed edges.
-        Otherwise, fall back to EXPECTED_LINKS * 2 (assuming undirected links represented both ways).
-        """
-        expected = self.expected_directed_edges_from_weight_matrix()
-        if expected is None:
-            expected = self.EXPECTED_LINKS * 2  # directed edges count
-        current = len(self.graph.edges)
-        self.logger.debug("Topology readiness check: %s/%s directed edges discovered.", current, expected)
-        return current >= expected
 
     # ---------------------------
     # Ryu event handlers
@@ -76,7 +42,7 @@ class L2SPF(app_manager.RyuApp):
         datapath = ev.msg.datapath
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
-        # table-miss: send to controller
+        # Install table-miss flow entry to send packets to the controller
         match = parser.OFPMatch()
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)]
         self.add_flow(datapath, 0, match, actions)
@@ -85,161 +51,124 @@ class L2SPF(app_manager.RyuApp):
     @set_ev_cls(event.EventLinkAdd)
     def handle_link_add(self, ev):
         """
-        Called for each link add event. We add BOTH directed edges to the DiGraph
-        so path algorithms can work on directed edges.
+        Handles link addition events. Correctly assigns weights for each
+        direction of the link independently if a weight_matrix is provided.
         """
         src_dpid = ev.link.src.dpid
         dst_dpid = ev.link.dst.dpid
         src_port = ev.link.src.port_no
         dst_port = ev.link.dst.port_no
 
-        # ensure nodes exist
         self.graph.add_node(src_dpid)
         self.graph.add_node(dst_dpid)
 
-        edge_cost = 1  # default
-        # weight_matrix provided is 1-indexed conceptually (s1 => index 0).
+        cost_forward = 1  # Default cost for src -> dst
+        cost_reverse = 1  # Default cost for dst -> src
+
         if self.weight_matrix:
-            # safe bounds check: dpids are integers (1..N typically)
             max_index = len(self.weight_matrix)
+            # Ensure dpids are within bounds of the matrix (assuming 1-based dpid)
             if 1 <= src_dpid <= max_index and 1 <= dst_dpid <= max_index:
-                w = self.weight_matrix[src_dpid - 1][dst_dpid - 1]
-                # treat zero as absent link; default cost = 1
-                edge_cost = w if (isinstance(w, (int, float)) and w != 0) else 1
+                # Look up forward cost
+                w_fwd = self.weight_matrix[src_dpid - 1][dst_dpid - 1]
+                cost_forward = w_fwd if (isinstance(w_fwd, (int, float)) and w_fwd != 0) else 1
 
-        # Add both directed edges with port info and weight
-        self.graph.add_edge(src_dpid, dst_dpid, port=src_port, weight=edge_cost)
-        self.graph.add_edge(dst_dpid, src_dpid, port=dst_port, weight=edge_cost)
+                # Look up reverse cost
+                w_rev = self.weight_matrix[dst_dpid - 1][src_dpid - 1]
+                cost_reverse = w_rev if (isinstance(w_rev, (int, float)) and w_rev != 0) else 1
 
-        self.logger.info("Added link: %s:%s <-> %s:%s (cost %s). Total directed edges: %d",
-                         src_dpid, src_port, dst_dpid, dst_port, edge_cost, len(self.graph.edges))
+        # Add each directed edge with its specific weight
+        self.graph.add_edge(src_dpid, dst_dpid, port=src_port, weight=cost_forward)
+        self.graph.add_edge(dst_dpid, src_dpid, port=dst_port, weight=cost_reverse)
 
-        # helpful debug: show edges when topology becomes ready
-        if self.is_topology_ready():
-            self.logger.info("Topology appears ready. Directed edges: %d", len(self.graph.edges))
-            self.logger.info("Edges: %s", list(self.graph.edges(data=True)))
+        self.logger.info("Added link: %s:%s (cost:%s) <-> %s:%s (cost:%s).",
+                         src_dpid, src_port, cost_forward, dst_dpid, dst_port, cost_reverse)
+        self.logger.debug("Current edges: %s", list(self.graph.edges(data=True)))
+
+    @set_ev_cls(event.EventLinkDelete)
+    def handle_link_delete(self, ev):
+        """
+        Handles link deletion events to keep the topology graph up-to-date.
+        """
+        src_dpid = ev.link.src.dpid
+        dst_dpid = ev.link.dst.dpid
+
+        try:
+            self.graph.remove_edge(src_dpid, dst_dpid)
+            self.graph.remove_edge(dst_dpid, src_dpid)
+            self.logger.info("Removed link between switch %s and %s", src_dpid, dst_dpid)
+        except nx.NetworkXError:
+            self.logger.warning("Attempted to remove a non-existent link between %s and %s", src_dpid, dst_dpid)
+
 
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
-        """
-        Main packet-in handler:
-        - learn MAC -> (dpid, in_port)
-        - handle ARP specially (learn + flood/reply forwarding)
-        - compute shortest path (when topology ready) and proactively install flows on the path
-        - if topology not ready: flood
-        """
         msg = ev.msg
         datapath = msg.datapath
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
-        in_port = msg.match.get('in_port', None)
+        in_port = msg.match.get('in_port')
 
         pkt = packet.Packet(msg.data)
         eth = pkt.get_protocol(ethernet.ethernet)
-        if eth is None:
-            return
 
-        # ignore LLDP to avoid loops
         if eth.ethertype == ether_types.ETH_TYPE_LLDP:
+            # ignore lldp packet
             return
 
         dst = eth.dst
         src = eth.src
-        src_switch_id = datapath.id
+        src_dpid = datapath.id
 
-        # Learn source MAC
-        self.mac_to_port[src] = (src_switch_id, in_port)
-        self.logger.debug("Learned MAC %s at switch %s, port %s", src, src_switch_id, in_port)
+        # Learn source MAC address to avoid flooding next time.
+        if src not in self.mac_to_port:
+            self.mac_to_port[src] = (src_dpid, in_port)
+            self.logger.info("Learned MAC %s at switch %s, port %s", src, src_dpid, in_port)
 
-        # Handle ARP
-        # arp_pkt = pkt.get_protocol(arp.arp)
-        # if arp_pkt:
-        #     # ARP requests are broadcast at ethernet level; they help hosts learn each others' MACs.
-        #     # For ARP replies, try to forward directly if we know mapping.
-        #     if arp_pkt.opcode == arp.ARP_REPLY:
-        #         # eth.dst on an ARP reply is usually the unicast MAC of requester; if we know it, forward.
-        #         if dst in self.mac_to_port:
-        #             dst_switch_id, dst_port = self.mac_to_port[dst]
-        #             dp = self.switches.dps.get(dst_switch_id)
-        #             if dp:
-        #                 actions = [parser.OFPActionOutput(dst_port)]
-        #                 self.send_packet_out(dp, msg, actions)
-        #                 self.logger.debug("Forwarded ARP reply to %s via switch %s port %s", dst, dst_switch_id, dst_port)
-        #                 return
-        #     # For ARP requests or unknown-case: flood
-        #     self.logger.debug("Flooding ARP packet (opcode=%s).", arp_pkt.opcode)
-        #     self.flood_packet(datapath, msg)
-        #     return
-
-        # If destination MAC known in controller mapping
         if dst in self.mac_to_port:
-            dst_switch_id, dst_port = self.mac_to_port[dst]
+            dst_dpid, dst_port = self.mac_to_port[dst]
 
-            # If topology is not ready, flood instead of computing path
-            if not self.is_topology_ready():
-                expected = self.expected_directed_edges_from_weight_matrix() or (self.EXPECTED_LINKS * 2)
-                self.logger.warning("Topology not stable yet (%s/%s directed edges). Flooding packet.", len(self.graph.edges), expected)
-                self.flood_packet(datapath, msg)
-                return
-
-            # If both hosts on same switch: trivial local forwarding
-            if src_switch_id == dst_switch_id:
+            # If both hosts are on the same switch, install a direct flow.
+            if src_dpid == dst_dpid:
                 actions = [parser.OFPActionOutput(dst_port)]
-                match = parser.OFPMatch(eth_dst=dst)
-                self.add_flow(datapath, 1, match, actions)
+                match = parser.OFPMatch(eth_src=src, eth_dst=dst)
+                # Use a higher priority for more specific host-to-host rules
+                self.add_flow(datapath, 20, match, actions)
                 self.send_packet_out(datapath, msg, actions)
-                self.logger.info("Installed local flow on switch %s for %s -> %s", src_switch_id, src, dst)
+                self.logger.info("Installed local flow on switch %s for %s -> %s", src_dpid, src, dst)
                 return
 
-            # Compute all shortest paths by weight, then select one (ECMP supported)
+            # Compute all shortest paths and select one (or a random one for ECMP)
             try:
-                paths = list(nx.all_shortest_paths(self.graph, source=src_switch_id,
-                                                  target=dst_switch_id, weight='weight'))
+                paths = list(nx.all_shortest_paths(self.graph, source=src_dpid, target=dst_dpid, weight='weight'))
                 if not paths:
                     raise nx.NetworkXNoPath
 
                 selected_path = self.select_route(paths)
                 self.logger.info("Selected path for %s -> %s: %s", src, dst, selected_path)
 
-                # Install flows for forward path (eth_dst == dst) on each hop
-                for i in range(len(selected_path) - 1):
-                    this_switch = selected_path[i]
-                    next_switch = selected_path[i + 1]
-                    out_port = self.graph[this_switch][next_switch]['port']
-                    dp = self.switches.dps.get(this_switch)
-                    if dp is None:
-                        self.logger.warning("Datapath for switch %s not found; skipping flow install.", this_switch)
-                        continue
-                    actions = [dp.ofproto_parser.OFPActionOutput(out_port)]
-                    match = dp.ofproto_parser.OFPMatch(eth_dst=dst)
-                    self.add_flow(dp, 10, match, actions)
-                    self.logger.debug("Installed forward flow on switch %s -> out_port %s for dst %s", this_switch, out_port, dst)
+                # --- PROACTIVELY INSTALL FORWARD AND REVERSE PATHS ---
+                self.install_path_flows(selected_path, src, dst, in_port, dst_port)
 
-                # Install flow on destination switch (ensure final hop)
-                dp_dst = self.switches.dps.get(dst_switch_id)
-                if dp_dst:
-                    actions = [dp_dst.ofproto_parser.OFPActionOutput(dst_port)]
-                    match = dp_dst.ofproto_parser.OFPMatch(eth_dst=dst)
-                    self.add_flow(dp_dst, 10, match, actions)
-                    self.logger.debug("Installed final forward flow on dest switch %s port %s for dst %s", dst_switch_id, dst_port, dst)
-
-                # Send the initial packet out the first hop from the original datapath
-                first_hop_port = self.graph[src_switch_id][selected_path[1]]['port']
+                # Send the initial packet out the first hop from the source switch
+                first_hop_port = self.graph[src_dpid][selected_path[1]]['port']
                 self.send_packet_out(datapath, msg, [parser.OFPActionOutput(first_hop_port)])
-                self.logger.debug("Sent initial packet out of switch %s port %s", src_switch_id, first_hop_port)
 
             except nx.NetworkXNoPath:
-                self.logger.warning("No path found in graph for %s -> %s. Flooding packet.", src, dst)
+                self.logger.warning("No path from %s to %s found in graph. Flooding.", src_dpid, dst_dpid)
                 self.flood_packet(datapath, msg)
         else:
-            # Destination unknown to controller -> flood (learn will occur when reply comes)
+            # Destination MAC is unknown, flood to discover it.
             self.logger.debug("Destination %s unknown. Flooding packet.", dst)
             self.flood_packet(datapath, msg)
 
     # ---------------------------
     # Flow and Packet helpers
     # ---------------------------
-    def add_flow(self, datapath, priority, match, actions, idle_timeout=0, hard_timeout=0):
+    def add_flow(self, datapath, priority, match, actions, idle_timeout=10, hard_timeout=0):
+        """
+        Adds a flow to a datapath with a default idle_timeout of 10 seconds.
+        """
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
         inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, actions)]
@@ -249,31 +178,85 @@ class L2SPF(app_manager.RyuApp):
         datapath.send_msg(mod)
 
     def select_route(self, routes):
-        # simple ECMP: random choice among equal-cost shortest paths
+        """
+        Selects a route from a list of equal-cost paths.
+        Uses random choice if ECMP is enabled, otherwise picks the first path.
+        """
         if self.ecmp and len(routes) > 1:
             return random.choice(routes)
         return routes[0]
 
     def flood_packet(self, datapath, msg):
+        """
+        Floods a packet on all ports except the one it came in on.
+        """
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
+        in_port = msg.match.get('in_port')
+        
         actions = [parser.OFPActionOutput(ofproto.OFPP_FLOOD)]
-        self.send_packet_out(datapath, msg, actions)
+        out = parser.OFPPacketOut(datapath=datapath,
+                                  buffer_id=ofproto.OFP_NO_BUFFER,
+                                  in_port=in_port,
+                                  actions=actions,
+                                  data=msg.data)
+        datapath.send_msg(out)
 
     def send_packet_out(self, datapath, msg, actions):
         """
-        Sends packet out via datapath. If the original packet was buffered on the switch,
-        buffer_id may not be valid on a different switch — to be safe, we include the data
-        and set buffer_id to NO_BUFFER.
+        Sends a packet out of a specific port on a datapath.
         """
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
+        in_port = msg.match.get('in_port', ofproto.OFPP_CONTROLLER)
 
-        # If the original msg had data, use it; otherwise we can't reconstruct
-        data = msg.data if hasattr(msg, 'data') else None
         out = parser.OFPPacketOut(datapath=datapath,
                                   buffer_id=ofproto.OFP_NO_BUFFER,
-                                  in_port=msg.match.get('in_port', ofproto.OFPP_CONTROLLER),
+                                  in_port=in_port,
                                   actions=actions,
-                                  data=data)
+                                  data=msg.data)
         datapath.send_msg(out)
+
+    def install_path_flows(self, path, src_mac, dst_mac, src_host_port, dst_host_port):
+        """
+        Installs flows for both the forward and reverse paths of a communication stream.
+        """
+        # 1. Install FORWARD path (src -> dst)
+        self.logger.debug("Installing FORWARD path flows for %s -> %s", src_mac, dst_mac)
+        for i in range(len(path) - 1):
+            this_dpid = path[i]
+            next_dpid = path[i + 1]
+            out_port = self.graph[this_dpid][next_dpid]['port']
+            dp = self.switches.dps.get(this_dpid)
+            if dp:
+                match = dp.ofproto_parser.OFPMatch(eth_src=src_mac, eth_dst=dst_mac)
+                actions = [dp.ofproto_parser.OFPActionOutput(out_port)]
+                self.add_flow(dp, 20, match, actions)
+        
+        # Final hop flow on the destination switch
+        dst_dp = self.switches.dps.get(path[-1])
+        if dst_dp:
+            match = dst_dp.ofproto_parser.OFPMatch(eth_src=src_mac, eth_dst=dst_mac)
+            actions = [dst_dp.ofproto_parser.OFPActionOutput(dst_host_port)]
+            self.add_flow(dst_dp, 20, match, actions)
+
+        # 2. Install REVERSE path (dst -> src)
+        self.logger.debug("Installing REVERSE path flows for %s <- %s", src_mac, dst_mac)
+        reverse_path = list(reversed(path))
+        for i in range(len(reverse_path) - 1):
+            this_dpid = reverse_path[i]
+            next_dpid = reverse_path[i + 1]
+            out_port = self.graph[this_dpid][next_dpid]['port']
+            dp = self.switches.dps.get(this_dpid)
+            if dp:
+                # Note: src and dst are swapped for the reverse path match
+                match = dp.ofproto_parser.OFPMatch(eth_src=dst_mac, eth_dst=src_mac)
+                actions = [dp.ofproto_parser.OFPActionOutput(out_port)]
+                self.add_flow(dp, 20, match, actions)
+
+        # Final hop flow on the original source switch
+        src_dp = self.switches.dps.get(reverse_path[-1])
+        if src_dp:
+            match = src_dp.ofproto_parser.OFPMatch(eth_src=dst_mac, eth_dst=src_mac)
+            actions = [src_dp.ofproto_parser.OFPActionOutput(src_host_port)]
+            self.add_flow(src_dp, 20, match, actions)
