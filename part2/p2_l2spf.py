@@ -57,7 +57,7 @@ class L2SPF(app_manager.RyuApp):
         self.graph.add_node(dst_dpid)
 
         if self.weight_matrix and max(src_dpid, dst_dpid) <= len(self.weight_matrix):
-            edge_cost = self.weight_matrix[src_dpid - 1][dst_dpid - 1]
+            edge_cost = self.weight_matrix[src_dpid][dst_dpid]
         else:
             edge_cost = 1
         
