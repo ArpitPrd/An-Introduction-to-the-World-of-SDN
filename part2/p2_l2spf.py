@@ -36,6 +36,8 @@ class L2SPF(app_manager.RyuApp):
         self.ecmp = self.config.get("ecmp", False)
         self.graph = nx.DiGraph()
         self.logger.info("L2SPF Controller Started. ECMP is %s.", "enabled" if self.ecmp else "disabled")
+        # Define the number of links expected in the topology
+        self.EXPECTED_LINKS = 8
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
@@ -114,6 +116,15 @@ class L2SPF(app_manager.RyuApp):
             # Using your original naming convention
             dst_switch_id, dst_port = self.mac_to_port[dst]
             
+            # *** NEW STABILITY CHECK ***
+            # Do not attempt to calculate a path until the topology is fully discovered.
+            # The graph will have 2 directed edges for each undirected link.
+            if len(self.graph.edges) < self.EXPECTED_LINKS * 2:
+                self.logger.warning("Topology not fully discovered yet (%s/%s edges). Flooding packet.", 
+                                  len(self.graph.edges), self.EXPECTED_LINKS * 2)
+                self.flood_packet(datapath, msg)
+                return
+
             if src_switch_id == dst_switch_id:
                 actions = [parser.OFPActionOutput(dst_port)]
                 match = parser.OFPMatch(eth_dst=dst)
