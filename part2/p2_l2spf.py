@@ -88,7 +88,7 @@ class L2SPF(app_manager.RyuApp):
 
         # *** ADDED DEBUGGING FOR LLDP ***
         if eth.ethertype == ether_types.ETH_TYPE_LLDP:
-            self.logger.info("LLDP packet received, ignoring.")
+            # self.logger.info("LLDP packet received, ignoring.")
             return
 
         dst = eth.dst
