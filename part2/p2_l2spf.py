@@ -222,7 +222,7 @@ class L2SPF(app_manager.RyuApp):
         Installs flows for both the forward and reverse paths of a communication stream.
         """
         # 1. Install FORWARD path (src -> dst)
-        self.logger.info("Installing FORWARD path flows for %s -> %s at path %s", src_mac, dst_mac)
+        self.logger.info("Installing FORWARD path flows for %s -> %s", src_mac, dst_mac)
         for i in range(len(path) - 1):
             this_dpid = path[i]
             next_dpid = path[i + 1]
