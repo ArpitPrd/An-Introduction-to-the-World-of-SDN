@@ -142,6 +142,19 @@ class L2SPF(app_manager.RyuApp):
             if dst_mac in self.mac_to_port:
                 dst_dpid, dst_host_port = self.mac_to_port[dst_mac]
 
+                if src_dpid == dst_dpid:
+                    self.logger.info("Packet is at its destination switch %s. Installing local delivery flow.", src_dpid)
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
+                                            ip_proto=6, # TCP
+                                            ipv4_src=src_ip,
+                                            ipv4_dst=dst_ip,
+                                            tcp_src=src_port,
+                                            tcp_dst=dst_port)
+                    actions = [parser.OFPActionOutput(dst_host_port)]
+                    self.add_flow(datapath, 20, match, actions)
+                    self.send_packet_out(datapath, msg, actions)
+                    return # Exit the handler early
+
                 try:
                     paths = list(nx.all_shortest_paths(self.graph, source=src_dpid, target=dst_dpid, weight='weight'))
                     if not paths:
