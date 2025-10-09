@@ -129,7 +129,7 @@ class L2SPF(app_manager.RyuApp):
                     this_switch = selected_path[i]
                     next_switch = selected_path[i+1]
                     out_port = self.graph[this_switch][next_switch]['port']
-                    
+                    print(f"Port Connection {this_switch} and {next_switch} via port={out_port}")
                     # Use the switches context to get the datapath object
                     dp = self.switches.dps[this_switch]
                     actions = [parser.OFPActionOutput(out_port)]
