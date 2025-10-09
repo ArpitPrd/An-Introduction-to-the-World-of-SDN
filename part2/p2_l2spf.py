@@ -119,11 +119,11 @@ class L2SPF(app_manager.RyuApp):
             # *** NEW STABILITY CHECK ***
             # Do not attempt to calculate a path until the topology is fully discovered.
             # The graph will have 2 directed edges for each undirected link.
-            if len(self.graph.edges) < self.EXPECTED_LINKS * 2:
-                self.logger.warning("Topology not fully discovered yet (%s/%s edges). Flooding packet.", 
-                                  len(self.graph.edges), self.EXPECTED_LINKS * 2)
-                self.flood_packet(datapath, msg)
-                return
+            # if len(self.graph.edges) < self.EXPECTED_LINKS * 2:
+            #     self.logger.warning("Topology not fully discovered yet (%s/%s edges). Flooding packet.", 
+            #                       len(self.graph.edges), self.EXPECTED_LINKS * 2)
+            #     self.flood_packet(datapath, msg)
+            #     return
 
             if src_switch_id == dst_switch_id:
                 actions = [parser.OFPActionOutput(dst_port)]
