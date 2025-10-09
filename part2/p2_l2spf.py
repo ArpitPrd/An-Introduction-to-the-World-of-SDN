@@ -222,7 +222,7 @@ class L2SPF(app_manager.RyuApp):
         Installs flows for both the forward and reverse paths of a communication stream.
         """
         # 1. Install FORWARD path (src -> dst)
-        self.logger.debug("Installing FORWARD path flows for %s -> %s", src_mac, dst_mac)
+        self.logger.info("Installing FORWARD path flows for %s -> %s", src_mac, dst_mac)
         for i in range(len(path) - 1):
             this_dpid = path[i]
             next_dpid = path[i + 1]
@@ -240,23 +240,23 @@ class L2SPF(app_manager.RyuApp):
             actions = [dst_dp.ofproto_parser.OFPActionOutput(dst_host_port)]
             self.add_flow(dst_dp, 20, match, actions)
 
-        # 2. Install REVERSE path (dst -> src)
-        self.logger.debug("Installing REVERSE path flows for %s <- %s", src_mac, dst_mac)
-        reverse_path = list(reversed(path))
-        for i in range(len(reverse_path) - 1):
-            this_dpid = reverse_path[i]
-            next_dpid = reverse_path[i + 1]
-            out_port = self.graph[this_dpid][next_dpid]['port']
-            dp = self.switches.dps.get(this_dpid)
-            if dp:
-                # Note: src and dst are swapped for the reverse path match
-                match = dp.ofproto_parser.OFPMatch(eth_src=dst_mac, eth_dst=src_mac)
-                actions = [dp.ofproto_parser.OFPActionOutput(out_port)]
-                self.add_flow(dp, 20, match, actions)
+        # # 2. Install REVERSE path (dst -> src)
+        # self.logger.debug("Installing REVERSE path flows for %s <- %s", src_mac, dst_mac)
+        # reverse_path = list(reversed(path))
+        # for i in range(len(reverse_path) - 1):
+        #     this_dpid = reverse_path[i]
+        #     next_dpid = reverse_path[i + 1]
+        #     out_port = self.graph[this_dpid][next_dpid]['port']
+        #     dp = self.switches.dps.get(this_dpid)
+        #     if dp:
+        #         # Note: src and dst are swapped for the reverse path match
+        #         match = dp.ofproto_parser.OFPMatch(eth_src=dst_mac, eth_dst=src_mac)
+        #         actions = [dp.ofproto_parser.OFPActionOutput(out_port)]
+        #         self.add_flow(dp, 20, match, actions)
 
         # Final hop flow on the original source switch
-        src_dp = self.switches.dps.get(reverse_path[-1])
-        if src_dp:
-            match = src_dp.ofproto_parser.OFPMatch(eth_src=dst_mac, eth_dst=src_mac)
-            actions = [src_dp.ofproto_parser.OFPActionOutput(src_host_port)]
-            self.add_flow(src_dp, 20, match, actions)
+        # src_dp = self.switches.dps.get(reverse_path[-1])
+        # if src_dp:
+        #     match = src_dp.ofproto_parser.OFPMatch(eth_src=dst_mac, eth_dst=src_mac)
+        #     actions = [src_dp.ofproto_parser.OFPActionOutput(src_host_port)]
+        #     self.add_flow(src_dp, 20, match, actions)
