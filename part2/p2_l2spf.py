@@ -225,32 +225,32 @@ class L2SPF(app_manager.RyuApp):
 
                 # ALSO install reverse path flows for return traffic (eth_dst == src)
                 # Determine reverse path (shortest path from dst_switch -> src_switch)
-                try:
-                    reverse_paths = list(nx.all_shortest_paths(self.graph, source=dst_switch_id,
-                                                               target=src_switch_id, weight='weight'))
-                    reverse_selected = self.select_route(reverse_paths)
-                    self.logger.debug("Selected reverse path for %s -> %s: %s", dst, src, reverse_selected)
+                # try:
+                #     reverse_paths = list(nx.all_shortest_paths(self.graph, source=dst_switch_id,
+                #                                                target=src_switch_id, weight='weight'))
+                #     reverse_selected = self.select_route(reverse_paths)
+                #     self.logger.debug("Selected reverse path for %s -> %s: %s", dst, src, reverse_selected)
 
-                    for i in range(len(reverse_selected) - 1):
-                        this_switch = reverse_selected[i]
-                        next_switch = reverse_selected[i + 1]
-                        out_port = self.graph[this_switch][next_switch]['port']
-                        dp = self.switches.dps.get(this_switch)
-                        if dp is None:
-                            self.logger.warning("Datapath for switch %s not found; skipping reverse flow install.", this_switch)
-                            continue
-                        actions = [dp.ofproto_parser.OFPActionOutput(out_port)]
-                        match = dp.ofproto_parser.OFPMatch(eth_dst=src)
-                        self.add_flow(dp, 10, match, actions)
-                        self.logger.debug("Installed reverse flow on switch %s -> out_port %s for dst %s", this_switch, out_port, src)
-                    # destination of reverse path is original source
-                    dp_src = self.switches.dps.get(src_switch_id)
-                    if dp_src:
-                        actions = [dp_src.ofproto_parser.OFPActionOutput(in_port)]
-                        match = dp_src.ofproto_parser.OFPMatch(eth_dst=src)
-                        self.add_flow(dp_src, 10, match, actions)
-                except nx.NetworkXNoPath:
-                    self.logger.warning("No reverse path found %s -> %s. Skipping reverse flow install.", dst_switch_id, src_switch_id)
+                #     for i in range(len(reverse_selected) - 1):
+                #         this_switch = reverse_selected[i]
+                #         next_switch = reverse_selected[i + 1]
+                #         out_port = self.graph[this_switch][next_switch]['port']
+                #         dp = self.switches.dps.get(this_switch)
+                #         if dp is None:
+                #             self.logger.warning("Datapath for switch %s not found; skipping reverse flow install.", this_switch)
+                #             continue
+                #         actions = [dp.ofproto_parser.OFPActionOutput(out_port)]
+                #         match = dp.ofproto_parser.OFPMatch(eth_dst=src)
+                #         self.add_flow(dp, 10, match, actions)
+                #         self.logger.debug("Installed reverse flow on switch %s -> out_port %s for dst %s", this_switch, out_port, src)
+                #     # destination of reverse path is original source
+                #     dp_src = self.switches.dps.get(src_switch_id)
+                #     if dp_src:
+                #         actions = [dp_src.ofproto_parser.OFPActionOutput(in_port)]
+                #         match = dp_src.ofproto_parser.OFPMatch(eth_dst=src)
+                #         self.add_flow(dp_src, 10, match, actions)
+                # except nx.NetworkXNoPath:
+                #     self.logger.warning("No reverse path found %s -> %s. Skipping reverse flow install.", dst_switch_id, src_switch_id)
 
                 # Send the initial packet out the first hop from the original datapath
                 first_hop_port = self.graph[src_switch_id][selected_path[1]]['port']
