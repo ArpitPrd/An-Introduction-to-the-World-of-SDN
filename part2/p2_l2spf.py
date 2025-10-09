@@ -8,34 +8,33 @@ from ryu.ofproto import ofproto_v1_3
 from ryu.lib.packet import packet, ethernet, ether_types, arp
 from ryu.topology import event
 from ryu.topology.api import get_switch
-# **FIX 1: Import the Switches class**
 from ryu.topology.switches import Switches
 
 import networkx as nx
 
 class L2SPF(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
-    # **FIX 2: Add the _CONTEXTS dictionary to declare the dependency**
     _CONTEXTS = {'switches': Switches}
 
     def __init__(self, *args, **kwargs):
         super(L2SPF, self).__init__(*args, **kwargs)
-        # Get the switches instance from the context
         self.switches = kwargs['switches']
-        
         self.mac_to_port = {}
         
-        # This part of your code was correct
         try:
             with open("config.json", 'r') as f:
                 self.config = json.load(f)
-        except (IOError, ValueError):
-            self.config = {} # Default if file not found or invalid
+        except (IOError, ValueError) as e:
+            self.logger.error("Error loading config.json: %s. Using defaults.", e)
+            self.config = {}
 
         self.weight_matrix = self.config.get("weight_matrix", [])
         self.ecmp = self.config.get("ecmp", False)
         self.graph = nx.DiGraph()
         self.logger.info("L2SPF Controller Started. ECMP is %s.", "enabled" if self.ecmp else "disabled")
+        
+        # **FIX 1: Corrected the number of expected links for this topology**
+        self.EXPECTED_LINKS = 6
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
@@ -54,7 +53,6 @@ class L2SPF(app_manager.RyuApp):
         src_port = ev.link.src.port_no
         dst_port = ev.link.dst.port_no
 
-        # Your logic for adding nodes and edges was correct
         self.graph.add_node(src_dpid)
         self.graph.add_node(dst_dpid)
 
@@ -65,10 +63,7 @@ class L2SPF(app_manager.RyuApp):
         
         self.graph.add_edge(src_dpid, dst_dpid, port=src_port, weight=edge_cost)
         self.graph.add_edge(dst_dpid, src_dpid, port=dst_port, weight=edge_cost)
-        self.logger.info("Added link: %s <-> %s", src_dpid, dst_dpid)
-        
-        # **FIX 3 (YOUR IDEA): Add diagnostic printing**
-        self.logger.info("Current Graph Edges: %s", self.graph.edges())
+        self.logger.info("Added link: %s <-> %s. Total edges: %d", src_dpid, dst_dpid, len(self.graph.edges))
 
     def add_flow(self, datapath, priority, match, actions):
         ofproto = datapath.ofproto
@@ -110,6 +105,14 @@ class L2SPF(app_manager.RyuApp):
         if dst in self.mac_to_port:
             dst_switch_id, dst_port = self.mac_to_port[dst]
             
+            # **FIX 2: Re-enabled the stability check**
+            # Do not attempt to calculate a path until the topology is fully discovered.
+            if len(self.graph.edges) < self.EXPECTED_LINKS * 2:
+                self.logger.warning("Topology not stable yet (%s/%s edges). Flooding packet.", 
+                                  len(self.graph.edges), self.EXPECTED_LINKS * 2)
+                self.flood_packet(datapath, msg)
+                return
+
             if src_switch_id == dst_switch_id:
                 actions = [parser.OFPActionOutput(dst_port)]
                 match = parser.OFPMatch(eth_dst=dst)
@@ -129,8 +132,7 @@ class L2SPF(app_manager.RyuApp):
                     this_switch = selected_path[i]
                     next_switch = selected_path[i+1]
                     out_port = self.graph[this_switch][next_switch]['port']
-                    print(f"Port Connection {this_switch} and {next_switch} via port={out_port}")
-                    # Use the switches context to get the datapath object
+                    
                     dp = self.switches.dps[this_switch]
                     actions = [parser.OFPActionOutput(out_port)]
                     match = parser.OFPMatch(eth_dst=dst)
@@ -150,8 +152,6 @@ class L2SPF(app_manager.RyuApp):
                 self.flood_packet(datapath, msg)
         else:
             self.flood_packet(datapath, msg)
-
-    # **FIX 4: Removed the old, conflicting logic from the end of the function**
 
     def flood_packet(self, datapath, msg):
         ofproto = datapath.ofproto
