@@ -98,9 +98,10 @@ class L2SPF(app_manager.RyuApp):
 
         dst = eth.dst
         src = eth.src
-        dpid = datapath.id
+        # Using your original naming convention
+        src_switch_id = datapath.id
 
-        self.mac_to_port[src] = (dpid, in_port)
+        self.mac_to_port[src] = (src_switch_id, in_port)
 
         # Handle ARP packets specifically
         arp_pkt = pkt.get_protocol(arp.arp)
@@ -110,9 +111,10 @@ class L2SPF(app_manager.RyuApp):
             return
 
         if dst in self.mac_to_port:
-            dst_dpid, dst_port = self.mac_to_port[dst]
+            # Using your original naming convention
+            dst_switch_id, dst_port = self.mac_to_port[dst]
             
-            if dpid == dst_dpid:
+            if src_switch_id == dst_switch_id:
                 actions = [parser.OFPActionOutput(dst_port)]
                 match = parser.OFPMatch(eth_dst=dst)
                 self.add_flow(datapath, 1, match, actions)
@@ -120,42 +122,44 @@ class L2SPF(app_manager.RyuApp):
                 return
 
             try:
-                paths = list(nx.all_shortest_paths(self.graph, source=dpid, target=dst_dpid, weight='weight'))
+                paths = list(nx.all_shortest_paths(self.graph, source=src_switch_id, target=dst_switch_id, weight='weight'))
                 if not paths: raise nx.NetworkXNoPath
                 
                 selected_path = self.select_route(paths)
                 self.logger.info("Selected path for %s -> %s: %s", src, dst, selected_path)
 
                 # Install rules on all switches in the path
+                # Using your original naming convention
                 for i in range(len(selected_path) - 1):
-                    this_dpid = selected_path[i]
-                    next_dpid = selected_path[i+1]
-                    out_port = self.graph[this_dpid][next_dpid]['port']
+                    this_switch = selected_path[i]
+                    next_switch = selected_path[i+1]
+                    out_port = self.graph[this_switch][next_switch]['port']
                     
                     # Use the switches context to get the datapath object
-                    dp = self.switches.dps[this_dpid]
+                    dp = self.switches.dps[this_switch]
                     actions = [parser.OFPActionOutput(out_port)]
                     match = parser.OFPMatch(eth_dst=dst)
                     self.add_flow(dp, 1, match, actions)
 
                 # Install the final rule on the destination switch
-                dp = self.switches.dps[dst_dpid]
+                dp = self.switches.dps[dst_switch_id]
                 actions = [parser.OFPActionOutput(dst_port)]
                 match = parser.OFPMatch(eth_dst=dst)
                 self.add_flow(dp, 1, match, actions)
 
                 # Send the initial packet out the first hop
-                first_hop_port = self.graph[dpid][selected_path[1]]['port']
+                first_hop_port = self.graph[src_switch_id][selected_path[1]]['port']
                 self.send_packet_out(datapath, msg, [parser.OFPActionOutput(first_hop_port)])
 
             except nx.NetworkXNoPath:
-                self.logger.warning("No path from switch %s to %s. Flooding.", dpid, dst_dpid)
+                self.logger.warning("No path from switch %s to %s. Flooding.", src_switch_id, dst_switch_id)
                 self.flood_packet(datapath, msg)
         else:
             self.flood_packet(datapath, msg)
 
     def flood_packet(self, datapath, msg):
         ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
         actions = [parser.OFPActionOutput(ofproto.OFPP_FLOOD)]
         self.send_packet_out(datapath, msg, actions)
 
