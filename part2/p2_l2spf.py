@@ -149,27 +149,27 @@ class L2SPF(app_manager.RyuApp):
 
         # Learn source MAC
         self.mac_to_port[src] = (src_switch_id, in_port)
-        self.logger.debug("Learned MAC %s at switch %s, port %s", src, src_switch_id, in_port)
+        self.logger.info("Learned MAC %s at switch %s, port %s", src, src_switch_id, in_port)
 
         # Handle ARP
-        arp_pkt = pkt.get_protocol(arp.arp)
-        if arp_pkt:
-            # ARP requests are broadcast at ethernet level; they help hosts learn each others' MACs.
-            # For ARP replies, try to forward directly if we know mapping.
-            if arp_pkt.opcode == arp.ARP_REPLY:
-                # eth.dst on an ARP reply is usually the unicast MAC of requester; if we know it, forward.
-                if dst in self.mac_to_port:
-                    dst_switch_id, dst_port = self.mac_to_port[dst]
-                    dp = self.switches.dps.get(dst_switch_id)
-                    if dp:
-                        actions = [parser.OFPActionOutput(dst_port)]
-                        self.send_packet_out(dp, msg, actions)
-                        self.logger.debug("Forwarded ARP reply to %s via switch %s port %s", dst, dst_switch_id, dst_port)
-                        return
-            # For ARP requests or unknown-case: flood
-            self.logger.debug("Flooding ARP packet (opcode=%s).", arp_pkt.opcode)
-            self.flood_packet(datapath, msg)
-            return
+        # arp_pkt = pkt.get_protocol(arp.arp)
+        # if arp_pkt:
+        #     # ARP requests are broadcast at ethernet level; they help hosts learn each others' MACs.
+        #     # For ARP replies, try to forward directly if we know mapping.
+        #     if arp_pkt.opcode == arp.ARP_REPLY:
+        #         # eth.dst on an ARP reply is usually the unicast MAC of requester; if we know it, forward.
+        #         if dst in self.mac_to_port:
+        #             dst_switch_id, dst_port = self.mac_to_port[dst]
+        #             dp = self.switches.dps.get(dst_switch_id)
+        #             if dp:
+        #                 actions = [parser.OFPActionOutput(dst_port)]
+        #                 self.send_packet_out(dp, msg, actions)
+        #                 self.logger.debug("Forwarded ARP reply to %s via switch %s port %s", dst, dst_switch_id, dst_port)
+        #                 return
+        #     # For ARP requests or unknown-case: flood
+        #     self.logger.debug("Flooding ARP packet (opcode=%s).", arp_pkt.opcode)
+        #     self.flood_packet(datapath, msg)
+        #     return
 
         # If destination MAC known in controller mapping
         if dst in self.mac_to_port:
@@ -222,35 +222,6 @@ class L2SPF(app_manager.RyuApp):
                     match = dp_dst.ofproto_parser.OFPMatch(eth_dst=dst)
                     self.add_flow(dp_dst, 10, match, actions)
                     self.logger.debug("Installed final forward flow on dest switch %s port %s for dst %s", dst_switch_id, dst_port, dst)
-
-                # ALSO install reverse path flows for return traffic (eth_dst == src)
-                # Determine reverse path (shortest path from dst_switch -> src_switch)
-                # try:
-                #     reverse_paths = list(nx.all_shortest_paths(self.graph, source=dst_switch_id,
-                #                                                target=src_switch_id, weight='weight'))
-                #     reverse_selected = self.select_route(reverse_paths)
-                #     self.logger.debug("Selected reverse path for %s -> %s: %s", dst, src, reverse_selected)
-
-                #     for i in range(len(reverse_selected) - 1):
-                #         this_switch = reverse_selected[i]
-                #         next_switch = reverse_selected[i + 1]
-                #         out_port = self.graph[this_switch][next_switch]['port']
-                #         dp = self.switches.dps.get(this_switch)
-                #         if dp is None:
-                #             self.logger.warning("Datapath for switch %s not found; skipping reverse flow install.", this_switch)
-                #             continue
-                #         actions = [dp.ofproto_parser.OFPActionOutput(out_port)]
-                #         match = dp.ofproto_parser.OFPMatch(eth_dst=src)
-                #         self.add_flow(dp, 10, match, actions)
-                #         self.logger.debug("Installed reverse flow on switch %s -> out_port %s for dst %s", this_switch, out_port, src)
-                #     # destination of reverse path is original source
-                #     dp_src = self.switches.dps.get(src_switch_id)
-                #     if dp_src:
-                #         actions = [dp_src.ofproto_parser.OFPActionOutput(in_port)]
-                #         match = dp_src.ofproto_parser.OFPMatch(eth_dst=src)
-                #         self.add_flow(dp_src, 10, match, actions)
-                # except nx.NetworkXNoPath:
-                #     self.logger.warning("No reverse path found %s -> %s. Skipping reverse flow install.", dst_switch_id, src_switch_id)
 
                 # Send the initial packet out the first hop from the original datapath
                 first_hop_port = self.graph[src_switch_id][selected_path[1]]['port']
