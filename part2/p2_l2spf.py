@@ -8,6 +8,7 @@ from ryu.ofproto import ofproto_v1_3
 from ryu.lib.packet import packet, ethernet, ether_types
 from ryu.topology import event
 from ryu.topology.switches import Switches
+from ryu.lib.packet import packet, ethernet, ether_types, ipv4, tcp
 
 import networkx as nx
 
@@ -113,54 +114,61 @@ class L2SPF(app_manager.RyuApp):
         eth = pkt.get_protocol(ethernet.ethernet)
 
         if eth.ethertype == ether_types.ETH_TYPE_LLDP:
-            # ignore lldp packet
             return
 
-        dst = eth.dst
-        src = eth.src
+        dst_mac = eth.dst
+        src_mac = eth.src
         src_dpid = datapath.id
 
         # Learn source MAC address to avoid flooding next time.
-        if src not in self.mac_to_port:
-            self.mac_to_port[src] = (src_dpid, in_port)
-            self.logger.info("Learned MAC %s at switch %s, port %s", src, src_dpid, in_port)
+        if src_mac not in self.mac_to_port:
+            self.mac_to_port[src_mac] = (src_dpid, in_port)
+            self.logger.info("Learned MAC %s at switch %s, port %s", src_mac, src_dpid, in_port)
+            
+        # --- START OF MODIFIED SECTION ---
 
-        if dst in self.mac_to_port:
-            dst_dpid, dst_port = self.mac_to_port[dst]
+        # We will only apply SPF routing for IP packets.
+        ipv4_pkt = pkt.get_protocol(ipv4.ipv4)
+        tcp_pkt = pkt.get_protocol(tcp.tcp)
 
-            # If both hosts are on the same switch, install a direct flow.
-            if src_dpid == dst_dpid:
-                actions = [parser.OFPActionOutput(dst_port)]
-                match = parser.OFPMatch(eth_src=src, eth_dst=dst)
-                # Use a higher priority for more specific host-to-host rules
-                self.add_flow(datapath, 20, match, actions)
-                self.send_packet_out(datapath, msg, actions)
-                self.logger.info("Installed local flow on switch %s for %s -> %s", src_dpid, src, dst)
-                return
+        if ipv4_pkt and tcp_pkt:
+            src_ip = ipv4_pkt.src
+            dst_ip = ipv4_pkt.dst
+            src_port = tcp_pkt.src_port
+            dst_port = tcp_pkt.dst_port
+            
+            self.logger.info("PacketIn: TCP %s:%s -> %s:%s on switch %s", src_ip, src_port, dst_ip, dst_port, src_dpid)
 
-            # Compute all shortest paths and select one (or a random one for ECMP)
-            try:
-                paths = list(nx.all_shortest_paths(self.graph, source=src_dpid, target=dst_dpid, weight='weight'))
-                if not paths:
-                    raise nx.NetworkXNoPath
+            if dst_mac in self.mac_to_port:
+                dst_dpid, dst_host_port = self.mac_to_port[dst_mac]
 
-                selected_path = self.select_route(paths)
-                self.logger.info("Selected path for %s -> %s: %s", src, dst, selected_path)
+                try:
+                    paths = list(nx.all_shortest_paths(self.graph, source=src_dpid, target=dst_dpid, weight='weight'))
+                    if not paths:
+                        raise nx.NetworkXNoPath
 
-                # --- PROACTIVELY INSTALL FORWARD AND REVERSE PATHS ---
-                self.install_path_flows(selected_path, src, dst, in_port, dst_port)
+                    selected_path = self.select_route(paths)
+                    self.logger.info("Selected path for flow %s:%s -> %s:%s is %s", src_ip, src_port, dst_ip, dst_port, selected_path)
+                    
+                    # Pass all flow details to the installation function
+                    self.install_path_flows(selected_path, src_mac, dst_mac, src_ip, dst_ip, src_port, dst_port, in_port, dst_host_port)
 
-                # Send the initial packet out the first hop from the source switch
-                first_hop_port = self.graph[src_dpid][selected_path[1]]['port']
-                self.send_packet_out(datapath, msg, [parser.OFPActionOutput(first_hop_port)])
+                    # Send the initial packet out
+                    first_hop_port = self.graph[src_dpid][selected_path[1]]['port']
+                    self.send_packet_out(datapath, msg, [parser.OFPActionOutput(first_hop_port)])
 
-            except nx.NetworkXNoPath:
-                self.logger.warning("No path from %s to %s found in graph. Flooding.", src_dpid, dst_dpid)
+                except nx.NetworkXNoPath:
+                    self.logger.warning("No path from %s to %s found in graph. Flooding.", src_dpid, dst_dpid)
+                    self.flood_packet(datapath, msg)
+            else:
+                self.logger.debug("Destination %s unknown. Flooding packet.", dst_mac)
                 self.flood_packet(datapath, msg)
-        else:
-            # Destination MAC is unknown, flood to discover it.
-            self.logger.debug("Destination %s unknown. Flooding packet.", dst)
+        
+        # If the packet is not TCP/IP (e.g., ARP), use the old flooding logic.
+        elif dst_mac not in self.mac_to_port:
+            self.logger.debug("Destination %s unknown (Non-IP). Flooding packet.", dst_mac)
             self.flood_packet(datapath, msg)
+        # --- END OF MODIFIED SECTION ---
 
     # ---------------------------
     # Flow and Packet helpers
@@ -217,33 +225,44 @@ class L2SPF(app_manager.RyuApp):
                                   data=msg.data)
         datapath.send_msg(out)
 
-    def install_path_flows(self, path, src_mac, dst_mac, src_host_port, dst_host_port):
+    def install_path_flows(self, path, src_mac, dst_mac, src_ip, dst_ip, src_port, dst_port, src_host_port, dst_host_port):
         """
-        Installs flows for both the forward and reverse paths of a communication stream.
+        Installs flows for both the forward and reverse paths of a communication stream
+        using a 5-tuple match for IP traffic.
         """
         # 1. Install FORWARD path (src -> dst)
-        self.logger.info("Installing FORWARD path flows for %s -> %s", src_mac, dst_mac)
+        self.logger.info("Installing FORWARD path flows for %s:%s -> %s:%s", src_ip, src_port, dst_ip, dst_port)
         for i in range(len(path) - 1):
             this_dpid = path[i]
             next_dpid = path[i + 1]
             out_port = self.graph[this_dpid][next_dpid]['port']
             dp = self.switches.dps.get(this_dpid)
             if dp:
-                self.logger.info(f"Installed at switch: {this_dpid}")
-                match = dp.ofproto_parser.OFPMatch(eth_src=src_mac, eth_dst=dst_mac)
-                actions = [dp.ofproto_parser.OFPActionOutput(out_port)]
+                parser = dp.ofproto_parser
+                match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
+                                        ip_proto=6, # 6 for TCP
+                                        ipv4_src=src_ip,
+                                        ipv4_dst=dst_ip,
+                                        tcp_src=src_port,
+                                        tcp_dst=dst_port)
+                actions = [parser.OFPActionOutput(out_port)]
                 self.add_flow(dp, 20, match, actions)
         
         # Final hop flow on the destination switch
         dst_dp = self.switches.dps.get(path[-1])
         if dst_dp:
-            self.logger.info(f"Installed at switch: {dst_dp.id}")
-            match = dst_dp.ofproto_parser.OFPMatch(eth_src=src_mac, eth_dst=dst_mac)
-            actions = [dst_dp.ofproto_parser.OFPActionOutput(dst_host_port)]
+            parser = dst_dp.ofproto_parser
+            match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
+                                    ip_proto=6,
+                                    ipv4_src=src_ip,
+                                    ipv4_dst=dst_ip,
+                                    tcp_src=src_port,
+                                    tcp_dst=dst_port)
+            actions = [parser.OFPActionOutput(dst_host_port)]
             self.add_flow(dst_dp, 20, match, actions)
 
-        # # 2. Install REVERSE path (dst -> src)
-        self.logger.info("Installing REVERSE path flows for %s <- %s", src_mac, dst_mac)
+        # 2. Install REVERSE path (dst -> src)
+        self.logger.info("Installing REVERSE path flows for %s:%s <- %s:%s", src_ip, src_port, dst_ip, dst_port)
         reverse_path = list(reversed(path))
         for i in range(len(reverse_path) - 1):
             this_dpid = reverse_path[i]
@@ -251,14 +270,26 @@ class L2SPF(app_manager.RyuApp):
             out_port = self.graph[this_dpid][next_dpid]['port']
             dp = self.switches.dps.get(this_dpid)
             if dp:
+                parser = dp.ofproto_parser
                 # Note: src and dst are swapped for the reverse path match
-                match = dp.ofproto_parser.OFPMatch(eth_src=dst_mac, eth_dst=src_mac)
-                actions = [dp.ofproto_parser.OFPActionOutput(out_port)]
+                match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
+                                        ip_proto=6,
+                                        ipv4_src=dst_ip,
+                                        ipv4_dst=src_ip,
+                                        tcp_src=dst_port,
+                                        tcp_dst=src_port)
+                actions = [parser.OFPActionOutput(out_port)]
                 self.add_flow(dp, 20, match, actions)
 
         # Final hop flow on the original source switch
         src_dp = self.switches.dps.get(reverse_path[-1])
         if src_dp:
-            match = src_dp.ofproto_parser.OFPMatch(eth_src=dst_mac, eth_dst=src_mac)
-            actions = [src_dp.ofproto_parser.OFPActionOutput(src_host_port)]
+            parser = src_dp.ofproto_parser
+            match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
+                                    ip_proto=6,
+                                    ipv4_src=dst_ip,
+                                    ipv4_dst=src_ip,
+                                    tcp_src=dst_port,
+                                    tcp_dst=src_port)
+            actions = [parser.OFPActionOutput(src_host_port)]
             self.add_flow(src_dp, 20, match, actions)
