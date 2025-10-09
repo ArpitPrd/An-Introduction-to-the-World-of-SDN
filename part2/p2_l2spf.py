@@ -103,7 +103,6 @@ class L2SPF(app_manager.RyuApp):
         # Using your original naming convention
         src_switch_id = datapath.id
 
-        self.mac_to_port[src] = (src_switch_id, in_port)
 
         # Handle ARP packets specifically
         arp_pkt = pkt.get_protocol(arp.arp)
@@ -111,6 +110,8 @@ class L2SPF(app_manager.RyuApp):
             self.logger.info("ARP packet received from %s. Flooding.", src)
             self.flood_packet(datapath, msg)
             return
+
+        self.mac_to_port[src] = (src_switch_id, in_port)
 
         if dst in self.mac_to_port:
             # Using your original naming convention
@@ -182,4 +183,3 @@ class L2SPF(app_manager.RyuApp):
         out = parser.OFPPacketOut(datapath=datapath, buffer_id=msg.buffer_id,
                                   in_port=in_port, actions=actions, data=data)
         datapath.send_msg(out)
-
