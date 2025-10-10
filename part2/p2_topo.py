@@ -3,7 +3,6 @@ from mininet.net import Mininet
 from mininet.log import setLogLevel, info
 from mininet.cli import CLI
 from mininet.node import RemoteController, OVSSwitch
-from mininet.link import TCLink
 
 class CustomTopo(Topo):
     def build(self):
