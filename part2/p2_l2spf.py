@@ -55,6 +55,8 @@ class L2SPF(app_manager.RyuApp):
         Handles link addition events. Correctly assigns weights for each
         direction of the link independently if a weight_matrix is provided.
         """
+        pkt = packet.Packet(ev.msg.data)
+        self.logger.info(f"The protocol used is: {pkt.get_protocols()}")
         src_dpid = ev.link.src.dpid
         dst_dpid = ev.link.dst.dpid
         src_port = ev.link.src.port_no
