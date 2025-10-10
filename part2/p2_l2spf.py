@@ -203,11 +203,6 @@ class L2SPF(app_manager.RyuApp):
         Selects a route from a list of equal-cost paths.
         Uses random choice if ECMP is enabled, otherwise picks the first path.
         """
-        if self.taken:
-            self.taken = False
-            return routes[0]
-        self.taken = True
-        return routes[1]
         if self.ecmp and len(routes) > 1:
             return random.choice(routes)
         return routes[0]
