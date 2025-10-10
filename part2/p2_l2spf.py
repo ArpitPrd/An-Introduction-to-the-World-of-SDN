@@ -55,8 +55,6 @@ class L2SPF(app_manager.RyuApp):
         Handles link addition events. Correctly assigns weights for each
         direction of the link independently if a weight_matrix is provided.
         """
-        pkt = packet.Packet(ev.msg.data)
-        self.logger.info(f"The protocol used is: {pkt.get_protocols()}")
         src_dpid = ev.link.src.dpid
         dst_dpid = ev.link.dst.dpid
         src_port = ev.link.src.port_no
@@ -176,7 +174,7 @@ class L2SPF(app_manager.RyuApp):
                     self.logger.warning("No path from %s to %s found in graph. Flooding.", src_dpid, dst_dpid)
                     self.flood_packet(datapath, msg)
             else:
-                self.logger.debug("Destination %s unknown. Flooding packet.", dst_mac)
+                self.logger.info("Destination %s unknown. Flooding packet.", dst_mac)
                 self.flood_packet(datapath, msg)
         
         # If the packet is not TCP/IP (e.g., ARP), use the old flooding logic.
