@@ -1,0 +1,30 @@
+With ECMP
+
+mininet> h1 iperf -c h2 -t 10 -P 2
+------------------------------------------------------------
+Client connecting to 10.0.0.2, TCP port 5001
+TCP window size: 85.3 KByte (default)
+------------------------------------------------------------
+[  1] local 10.0.0.1 port 51428 connected with 10.0.0.2 port 5001
+[  2] local 10.0.0.1 port 51430 connected with 10.0.0.2 port 5001
+[ ID] Interval       Transfer     Bandwidth
+[  1] 0.0000-10.1402 sec  11.3 MBytes  9.31 Mbits/sec
+[  2] 0.0000-10.2530 sec  11.4 MBytes  9.31 Mbits/sec
+[SUM] 0.0000-10.1086 sec  22.6 MBytes  18.8 Mbits/sec
+[ CT] final connect times (min/avg/max/stdev) = 99.875/149.173/198.471/69.718 ms (tot/err) = 2/0
+
+
+without ECMP
+
+mininet> h1 iperf -c h2 -t 10 -P 2
+[  2] local 10.0.0.1 port 51432 connected with 10.0.0.2 port 5001
+[  1] local 10.0.0.1 port 51434 connected with 10.0.0.2 port 5001
+------------------------------------------------------------
+Client connecting to 10.0.0.2, TCP port 5001
+TCP window size: 85.3 KByte (default)
+------------------------------------------------------------
+[ ID] Interval       Transfer     Bandwidth
+[  1] 0.0000-10.1557 sec  5.63 MBytes  4.65 Mbits/sec
+[  2] 0.0000-10.2525 sec  5.75 MBytes  4.70 Mbits/sec
+[SUM] 0.0000-10.1502 sec  11.4 MBytes  9.40 Mbits/sec
+[ CT] final connect times (min/avg/max/stdev) = 211.221/211.234/211.247/0.018 ms (tot/err) = 2/0
