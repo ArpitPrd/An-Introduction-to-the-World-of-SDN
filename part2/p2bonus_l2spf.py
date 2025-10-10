@@ -8,7 +8,10 @@ from ryu.ofproto import ofproto_v1_3
 from ryu.lib.packet import packet, ethernet, ether_types
 from ryu.topology import event
 from ryu.topology.switches import Switches
-from ryu.lib.packet import packet, ethernet, ether_types, ipv4, tcp
+# --- START OF MODIFIED SECTION ---
+from ryu.lib.packet import ipv4, tcp, udp
+# --- END OF MODIFIED SECTION ---
+
 
 import networkx as nx
 
@@ -22,9 +25,7 @@ class L2SPF(app_manager.RyuApp):
         self.switches = kwargs['switches']
         self.mac_to_port = {}
         self.graph = nx.DiGraph()
-        # --- START OF MODIFIED SECTION ---
         self.flow_counts = {} # Tracks the number of flows on each link
-        # --- END OF MODIFIED SECTION ---
         self.config = {}
         try:
             with open("config.json", 'r') as f:
@@ -45,7 +46,6 @@ class L2SPF(app_manager.RyuApp):
         datapath = ev.msg.datapath
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
-        # Install table-miss flow entry to send packets to the controller
         match = parser.OFPMatch()
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)]
         self.add_flow(datapath, 0, match, actions)
@@ -53,11 +53,6 @@ class L2SPF(app_manager.RyuApp):
 
     @set_ev_cls(event.EventLinkAdd)
     def handle_link_add(self, ev):
-        """
-        Handles link addition events. Correctly assigns weights for each
-        direction of the link independently if a weight_matrix is provided.
-        Initializes flow counts for new links.
-        """
         src_dpid = ev.link.src.dpid
         dst_dpid = ev.link.dst.dpid
         src_port = ev.link.src.port_no
@@ -80,11 +75,8 @@ class L2SPF(app_manager.RyuApp):
         self.graph.add_edge(src_dpid, dst_dpid, port=src_port, weight=cost_forward)
         self.graph.add_edge(dst_dpid, src_dpid, port=dst_port, weight=cost_reverse)
 
-        # --- START OF MODIFIED SECTION ---
-        # Initialize flow counts for the new link
         self.flow_counts[(src_dpid, dst_dpid)] = 0
         self.flow_counts[(dst_dpid, src_dpid)] = 0
-        # --- END OF MODIFIED SECTION ---
 
         self.logger.info("Added link: %s:%s (cost:%s) <-> %s:%s (cost:%s).",
                          src_dpid, src_port, cost_forward, dst_dpid, dst_port, cost_reverse)
@@ -93,20 +85,14 @@ class L2SPF(app_manager.RyuApp):
 
     @set_ev_cls(event.EventLinkDelete)
     def handle_link_delete(self, ev):
-        """
-        Handles link deletion events to keep the topology graph and flow counts up-to-date.
-        """
         src_dpid = ev.link.src.dpid
         dst_dpid = ev.link.dst.dpid
 
         try:
             self.graph.remove_edge(src_dpid, dst_dpid)
             self.graph.remove_edge(dst_dpid, src_dpid)
-            # --- START OF MODIFIED SECTION ---
-            # Remove link from flow counter
             self.flow_counts.pop((src_dpid, dst_dpid), None)
             self.flow_counts.pop((dst_dpid, src_dpid), None)
-            # --- END OF MODIFIED SECTION ---
             self.logger.info("Removed link between switch %s and %s", src_dpid, dst_dpid)
         except nx.NetworkXError:
             self.logger.warning("Attempted to remove a non-existent link between %s and %s", src_dpid, dst_dpid)
@@ -135,29 +121,39 @@ class L2SPF(app_manager.RyuApp):
             self.logger.info("Learned MAC %s at switch %s, port %s", src_mac, src_dpid, in_port)
 
         ipv4_pkt = pkt.get_protocol(ipv4.ipv4)
+        # --- START OF MODIFIED SECTION ---
         tcp_pkt = pkt.get_protocol(tcp.tcp)
+        udp_pkt = pkt.get_protocol(udp.udp)
 
-        if ipv4_pkt and tcp_pkt:
+        # Handle TCP or UDP traffic with the intelligent routing logic
+        if ipv4_pkt and (tcp_pkt or udp_pkt):
             src_ip = ipv4_pkt.src
             dst_ip = ipv4_pkt.dst
-            src_port = tcp_pkt.src_port
-            dst_port = tcp_pkt.dst_port
 
-            self.logger.info("PacketIn: TCP %s:%s -> %s:%s on switch %s", src_ip, src_port, dst_ip, dst_port, src_dpid)
+            if tcp_pkt:
+                l4_proto = ipv4_pkt.proto
+                src_port = tcp_pkt.src_port
+                dst_port = tcp_pkt.dst_port
+                proto_name = "TCP"
+            else: # udp_pkt must be present
+                l4_proto = ipv4_pkt.proto
+                src_port = udp_pkt.src_port
+                dst_port = udp_pkt.dst_port
+                proto_name = "UDP"
+
+            self.logger.info("PacketIn: %s %s:%s -> %s:%s on switch %s",
+                             proto_name, src_ip, src_port, dst_ip, dst_port, src_dpid)
 
             if dst_mac in self.mac_to_port:
                 dst_dpid, dst_host_port = self.mac_to_port[dst_mac]
 
                 if src_dpid == dst_dpid:
                     self.logger.info("Packet is at its destination switch %s. Installing local delivery flow.", src_dpid)
-                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
-                                            ip_proto=6, # TCP
-                                            ipv4_src=src_ip,
-                                            ipv4_dst=dst_ip,
-                                            tcp_src=src_port,
-                                            tcp_dst=dst_port)
+                    # Pass all protocol info to the installation function
+                    self.install_path_flows([], src_mac, dst_mac, src_ip, dst_ip,
+                                            l4_proto, src_port, dst_port, in_port, dst_host_port)
+                    # For local delivery, the action is just the host port.
                     actions = [parser.OFPActionOutput(dst_host_port)]
-                    self.add_flow(datapath, 20, match, actions)
                     self.send_packet_out(datapath, msg, actions)
                     return
 
@@ -166,15 +162,15 @@ class L2SPF(app_manager.RyuApp):
                     if not paths:
                         raise nx.NetworkXNoPath
 
-                    # --- START OF MODIFIED SECTION ---
                     selected_path = self.select_route(paths)
-                    self.logger.info("Selected path for flow %s:%s -> %s:%s is %s", src_ip, src_port, dst_ip, dst_port, selected_path)
+                    self.logger.info("Selected path for flow %s:%s -> %s:%s is %s",
+                                     src_ip, src_port, dst_ip, dst_port, selected_path)
                     
-                    # Update utilization counts for the chosen path
                     self._update_flow_counts(selected_path)
-                    # --- END OF MODIFIED SECTION ---
 
-                    self.install_path_flows(selected_path, src_mac, dst_mac, src_ip, dst_ip, src_port, dst_port, in_port, dst_host_port)
+                    self.install_path_flows(selected_path, src_mac, dst_mac, src_ip, dst_ip,
+                                            l4_proto, src_port, dst_port, in_port, dst_host_port)
+                    
                     first_hop_port = self.graph[src_dpid][selected_path[1]]['port']
                     self.send_packet_out(datapath, msg, [parser.OFPActionOutput(first_hop_port)])
 
@@ -184,6 +180,7 @@ class L2SPF(app_manager.RyuApp):
             else:
                 self.logger.debug("Destination %s unknown. Flooding packet.", dst_mac)
                 self.flood_packet(datapath, msg)
+        # --- END OF MODIFIED SECTION ---
         
         elif dst_mac not in self.mac_to_port:
             self.logger.debug("Destination %s unknown (Non-IP). Flooding packet.", dst_mac)
@@ -201,14 +198,7 @@ class L2SPF(app_manager.RyuApp):
                                 idle_timeout=idle_timeout, hard_timeout=hard_timeout)
         datapath.send_msg(mod)
         
-    # --- START OF MODIFIED SECTION ---
     def select_route(self, routes):
-        """
-        Selects a route from a list of equal-cost paths based on link utilization.
-        If ECMP is disabled or only one path exists, it returns the first path.
-        Otherwise, it calculates the cumulative flow count for each path and
-        selects the one with the lowest count.
-        """
         if not self.ecmp or len(routes) <= 1:
             return routes[0]
 
@@ -217,10 +207,8 @@ class L2SPF(app_manager.RyuApp):
 
         for path in routes:
             current_path_utilization = 0
-            # Calculate the total utilization for the current path
             for i in range(len(path) - 1):
                 link = (path[i], path[i+1])
-                # Add the flow count of the link to the path's total utilization
                 current_path_utilization += self.flow_counts.get(link, 0)
             
             self.logger.info("Path %s has a utilization of %d", path, current_path_utilization)
@@ -229,7 +217,6 @@ class L2SPF(app_manager.RyuApp):
                 min_utilization = current_path_utilization
                 best_path = path
         
-        # Fallback in case all paths have infinite utilization (should not happen)
         if best_path is None:
             best_path = routes[0]
             self.logger.warning("Could not determine best path, falling back to first option.")
@@ -237,9 +224,6 @@ class L2SPF(app_manager.RyuApp):
         return best_path
 
     def _update_flow_counts(self, path):
-        """
-        Increments the flow count for each link in the given path (and its reverse).
-        """
         # Forward path
         for i in range(len(path) - 1):
             link = (path[i], path[i+1])
@@ -254,34 +238,68 @@ class L2SPF(app_manager.RyuApp):
                 self.flow_counts[link] += 1
         
         self.logger.debug("Updated flow counts: %s", self.flow_counts)
-    # --- END OF MODIFIED SECTION ---
 
     def flood_packet(self, datapath, msg):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
         in_port = msg.match.get('in_port')
-        
         actions = [parser.OFPActionOutput(ofproto.OFPP_FLOOD)]
         out = parser.OFPPacketOut(datapath=datapath,
                                   buffer_id=ofproto.OFP_NO_BUFFER,
-                                  in_port=in_port,
-                                  actions=actions,
-                                  data=msg.data)
+                                  in_port=in_port, actions=actions, data=msg.data)
         datapath.send_msg(out)
 
     def send_packet_out(self, datapath, msg, actions):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
         in_port = msg.match.get('in_port', ofproto.OFPP_CONTROLLER)
-
         out = parser.OFPPacketOut(datapath=datapath,
                                   buffer_id=ofproto.OFP_NO_BUFFER,
-                                  in_port=in_port,
-                                  actions=actions,
-                                  data=msg.data)
+                                  in_port=in_port, actions=actions, data=msg.data)
         datapath.send_msg(out)
 
-    def install_path_flows(self, path, src_mac, dst_mac, src_ip, dst_ip, src_port, dst_port, src_host_port, dst_host_port):
+    # --- START OF MODIFIED SECTION ---
+    def install_path_flows(self, path, src_mac, dst_mac, src_ip, dst_ip,
+                           l4_proto, src_port, dst_port, src_host_port, dst_host_port):
+        """
+        Installs flows for both forward and reverse paths.
+        Dynamically creates matches for TCP (6) or UDP (17).
+        """
+        
+        # --- Helper function to create match ---
+        def create_match(parser, ipv4_src, ipv4_dst, l4_proto, port_src, port_dst):
+            match_args = {
+                'eth_type': ether_types.ETH_TYPE_IP,
+                'ip_proto': l4_proto,
+                'ipv4_src': ipv4_src,
+                'ipv4_dst': ipv4_dst
+            }
+            if l4_proto == 6: # TCP
+                match_args['tcp_src'] = port_src
+                match_args['tcp_dst'] = port_dst
+            elif l4_proto == 17: # UDP
+                match_args['udp_src'] = port_src
+                match_args['udp_dst'] = port_dst
+            
+            return parser.OFPMatch(**match_args)
+        
+        # --- Handle special case for local delivery (empty path) ---
+        if not path:
+            src_dp = self.switches.dps.get(self.mac_to_port[src_mac][0])
+            if src_dp:
+                parser = src_dp.ofproto_parser
+                # Install forward flow
+                match = create_match(parser, src_ip, dst_ip, l4_proto, src_port, dst_port)
+                actions = [parser.OFPActionOutput(dst_host_port)]
+                self.add_flow(src_dp, 20, match, actions)
+                # Install reverse flow
+                match_rev = create_match(parser, dst_ip, src_ip, l4_proto, dst_port, src_port)
+                actions_rev = [parser.OFPActionOutput(src_host_port)]
+                self.add_flow(src_dp, 20, match_rev, actions_rev)
+            return
+
+
+        # --- 1. Install FORWARD path (src -> dst) ---
         self.logger.info("Installing FORWARD path flows for %s:%s -> %s:%s", src_ip, src_port, dst_ip, dst_port)
         for i in range(len(path) - 1):
             this_dpid = path[i]
@@ -290,27 +308,18 @@ class L2SPF(app_manager.RyuApp):
             dp = self.switches.dps.get(this_dpid)
             if dp:
                 parser = dp.ofproto_parser
-                match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
-                                        ip_proto=6, # 6 for TCP
-                                        ipv4_src=src_ip,
-                                        ipv4_dst=dst_ip,
-                                        tcp_src=src_port,
-                                        tcp_dst=dst_port)
+                match = create_match(parser, src_ip, dst_ip, l4_proto, src_port, dst_port)
                 actions = [parser.OFPActionOutput(out_port)]
                 self.add_flow(dp, 20, match, actions)
         
         dst_dp = self.switches.dps.get(path[-1])
         if dst_dp:
             parser = dst_dp.ofproto_parser
-            match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
-                                    ip_proto=6,
-                                    ipv4_src=src_ip,
-                                    ipv4_dst=dst_ip,
-                                    tcp_src=src_port,
-                                    tcp_dst=dst_port)
+            match = create_match(parser, src_ip, dst_ip, l4_proto, src_port, dst_port)
             actions = [parser.OFPActionOutput(dst_host_port)]
             self.add_flow(dst_dp, 20, match, actions)
 
+        # --- 2. Install REVERSE path (dst -> src) ---
         self.logger.info("Installing REVERSE path flows for %s:%s <- %s:%s", src_ip, src_port, dst_ip, dst_port)
         reverse_path = list(reversed(path))
         for i in range(len(reverse_path) - 1):
@@ -320,23 +329,15 @@ class L2SPF(app_manager.RyuApp):
             dp = self.switches.dps.get(this_dpid)
             if dp:
                 parser = dp.ofproto_parser
-                match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
-                                        ip_proto=6,
-                                        ipv4_src=dst_ip,
-                                        ipv4_dst=src_ip,
-                                        tcp_src=dst_port,
-                                        tcp_dst=src_port)
+                # Note: src and dst are swapped for the reverse path match
+                match = create_match(parser, dst_ip, src_ip, l4_proto, dst_port, src_port)
                 actions = [parser.OFPActionOutput(out_port)]
                 self.add_flow(dp, 20, match, actions)
 
         src_dp = self.switches.dps.get(reverse_path[-1])
         if src_dp:
             parser = src_dp.ofproto_parser
-            match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
-                                    ip_proto=6,
-                                    ipv4_src=dst_ip,
-                                    ipv4_dst=src_ip,
-                                    tcp_src=dst_port,
-                                    tcp_dst=src_port)
+            match = create_match(parser, dst_ip, src_ip, l4_proto, dst_port, src_port)
             actions = [parser.OFPActionOutput(src_host_port)]
             self.add_flow(src_dp, 20, match, actions)
+    # --- END OF MODIFIED SECTION ---
