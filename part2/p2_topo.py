@@ -21,8 +21,8 @@ class CustomTopo(Topo):
         h2 = self.addHost('h2')
         
         # Connect hosts to switch S1
-        self.addLink(h1, s1, bw=bw)
-        self.addLink(h2, s6, bw=bw)
+        self.addLink(h1, s1)
+        self.addLink(h2, s6)
 
         # Connect switches with each other
         self.addLink(s1, s2, bw=bw)
