@@ -36,7 +36,7 @@ def run():
     """Create the network, start it, and enter the CLI."""
     topo = CustomTopo()
     net = Mininet(topo=topo, switch=OVSSwitch, build=False, controller=None,
-              autoSetMacs=True, autoStaticArp=True, link=TCLink)
+              autoSetMacs=True, autoStaticArp=True)
     net.addController('c0', controller=RemoteController, ip="127.0.0.1", protocol='tcp', port=6633)
     net.build()
     net.start()
