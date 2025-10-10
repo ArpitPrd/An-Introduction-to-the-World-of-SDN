@@ -23,7 +23,7 @@ class L2SPF(app_manager.RyuApp):
         self.mac_to_port = {}
         self.graph = nx.DiGraph()
         self.config = {}
-
+        self.taken = False
         try:
             with open("config.json", 'r') as f:
                 self.config = json.load(f)
@@ -203,6 +203,9 @@ class L2SPF(app_manager.RyuApp):
         Selects a route from a list of equal-cost paths.
         Uses random choice if ECMP is enabled, otherwise picks the first path.
         """
+        if self.taken:
+            return routes[0]
+        return routes[1]
         if self.ecmp and len(routes) > 1:
             return random.choice(routes)
         return routes[0]
