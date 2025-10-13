@@ -85,3 +85,10 @@
     - bonus file: p2bonus_l2spf.py
 - Part3:
 - Part4:
+
+
+
+## Baadal Notes:
+
+
+- Always to --observe-links flag

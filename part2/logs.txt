@@ -1,30 +1,137 @@
-With ECMP
-
-mininet> h1 iperf -c h2 -t 10 -P 2
-------------------------------------------------------------
-Client connecting to 10.0.0.2, TCP port 5001
-TCP window size: 85.3 KByte (default)
-------------------------------------------------------------
-[  1] local 10.0.0.1 port 51428 connected with 10.0.0.2 port 5001
-[  2] local 10.0.0.1 port 51430 connected with 10.0.0.2 port 5001
-[ ID] Interval       Transfer     Bandwidth
-[  1] 0.0000-10.1402 sec  11.3 MBytes  9.31 Mbits/sec
-[  2] 0.0000-10.2530 sec  11.4 MBytes  9.31 Mbits/sec
-[SUM] 0.0000-10.1086 sec  22.6 MBytes  18.8 Mbits/sec
-[ CT] final connect times (min/avg/max/stdev) = 99.875/149.173/198.471/69.718 ms (tot/err) = 2/0
-
 
 without ECMP
-
+mininet> h2 iperf -s &
 mininet> h1 iperf -c h2 -t 10 -P 2
-[  2] local 10.0.0.1 port 51432 connected with 10.0.0.2 port 5001
-[  1] local 10.0.0.1 port 51434 connected with 10.0.0.2 port 5001
+------------------------------------------------------------
+Client connecting to 10.0.0.2, TCP port 5001
+TCP window size: 85.3 KByte (default)
+------------------------------------------------------------
+[  1] local 10.0.0.1 port 51640 connected with 10.0.0.2 port 5001
+[  2] local 10.0.0.1 port 51642 connected with 10.0.0.2 port 5001
+[ ID] Interval       Transfer     Bandwidth
+[  1] 0.0000-10.1723 sec  5.63 MBytes  4.64 Mbits/sec
+[  2] 0.0000-10.2691 sec  5.75 MBytes  4.70 Mbits/sec
+[SUM] 0.0000-10.1725 sec  11.4 MBytes  9.38 Mbits/sec
+[ CT] final connect times (min/avg/max/stdev) = 127.203/127.473/127.743/0.382 ms (tot/err) = 2/0
+
+Rules:
+*** s1 ------------------------------------------------------------------------
+ cookie=0x0, duration=43.694s, table=0, n_packets=80, n_bytes=4800, priority=65535,dl_dst=01:80:c2:00:00:0e,dl_type=0x88cc actions=CONTROLLER:65535
+ cookie=0x0, duration=43.698s, table=0, n_packets=25926, n_bytes=2874645, idle_timeout=10, priority=0 actions=CONTROLLER:65535
+*** s2 ------------------------------------------------------------------------
+ cookie=0x0, duration=43.703s, table=0, n_packets=78, n_bytes=4680, priority=65535,dl_dst=01:80:c2:00:00:0e,dl_type=0x88cc actions=CONTROLLER:65535
+ cookie=0x0, duration=43.708s, table=0, n_packets=25952, n_bytes=2876983, idle_timeout=10, priority=0 actions=CONTROLLER:65535
+*** s3 ------------------------------------------------------------------------
+ cookie=0x0, duration=43.717s, table=0, n_packets=79, n_bytes=4740, priority=65535,dl_dst=01:80:c2:00:00:0e,dl_type=0x88cc actions=CONTROLLER:65535
+ cookie=0x0, duration=43.721s, table=0, n_packets=25959, n_bytes=2877145, idle_timeout=10, priority=0 actions=CONTROLLER:65535
+*** s4 ------------------------------------------------------------------------
+ cookie=0x0, duration=43.726s, table=0, n_packets=80, n_bytes=4800, priority=65535,dl_dst=01:80:c2:00:00:0e,dl_type=0x88cc actions=CONTROLLER:65535
+ cookie=0x0, duration=43.730s, table=0, n_packets=25958, n_bytes=2876674, idle_timeout=10, priority=0 actions=CONTROLLER:65535
+*** s5 ------------------------------------------------------------------------
+ cookie=0x0, duration=43.737s, table=0, n_packets=78, n_bytes=4680, priority=65535,dl_dst=01:80:c2:00:00:0e,dl_type=0x88cc actions=CONTROLLER:65535
+ cookie=0x0, duration=43.742s, table=0, n_packets=25959, n_bytes=2875882, idle_timeout=10, priority=0 actions=CONTROLLER:65535
+*** s6 ------------------------------------------------------------------------
+ cookie=0x0, duration=43.748s, table=0, n_packets=80, n_bytes=4800, priority=65535,dl_dst=01:80:c2:00:00:0e,dl_type=0x88cc actions=CONTROLLER:65535
+ cookie=0x0, duration=43.750s, table=0, n_packets=25933, n_bytes=2873394, idle_timeout=10, priority=0 actions=CONTROLLER:65535
+
+With ECMP
+
+mininet> h2 iperf -s &
+mininet> h1 iperf -c h2 -t 10 -P 2
+[  2] local 10.0.0.1 port 51646 connected with 10.0.0.2 port 5001
+[  1] local 10.0.0.1 port 51648 connected with 10.0.0.2 port 5001
 ------------------------------------------------------------
 Client connecting to 10.0.0.2, TCP port 5001
 TCP window size: 85.3 KByte (default)
 ------------------------------------------------------------
 [ ID] Interval       Transfer     Bandwidth
-[  1] 0.0000-10.1557 sec  5.63 MBytes  4.65 Mbits/sec
-[  2] 0.0000-10.2525 sec  5.75 MBytes  4.70 Mbits/sec
-[SUM] 0.0000-10.1502 sec  11.4 MBytes  9.40 Mbits/sec
-[ CT] final connect times (min/avg/max/stdev) = 211.221/211.234/211.247/0.018 ms (tot/err) = 2/0
+[  2] 0.0000-10.4810 sec  11.6 MBytes  9.30 Mbits/sec
+[  1] 0.0000-10.4805 sec  11.6 MBytes  9.30 Mbits/sec
+[SUM] 0.0000-10.0905 sec  23.3 MBytes  19.3 Mbits/sec
+[ CT] final connect times (min/avg/max/stdev) = 129.811/129.906/130.000/0.134 ms (tot/err) = 2/0
+
+Rules:
+
+*** s1 ------------------------------------------------------------------------
+ cookie=0x0, duration=46.977s, table=0, n_packets=86, n_bytes=5160, priority=65535,dl_dst=01:80:c2:00:00:0e,dl_type=0x88cc actions=CONTROLLER:65535
+ cookie=0x0, duration=46.985s, table=0, n_packets=28473, n_bytes=3018155, idle_timeout=10, priority=0 actions=CONTROLLER:65535
+*** s2 ------------------------------------------------------------------------
+ cookie=0x0, duration=46.990s, table=0, n_packets=86, n_bytes=5160, priority=65535,dl_dst=01:80:c2:00:00:0e,dl_type=0x88cc actions=CONTROLLER:65535
+ cookie=0x0, duration=46.996s, table=0, n_packets=28417, n_bytes=3012365, idle_timeout=10, priority=0 actions=CONTROLLER:65535
+*** s3 ------------------------------------------------------------------------
+ cookie=0x0, duration=46.998s, table=0, n_packets=84, n_bytes=5040, priority=65535,dl_dst=01:80:c2:00:00:0e,dl_type=0x88cc actions=CONTROLLER:65535
+ cookie=0x0, duration=47.006s, table=0, n_packets=28472, n_bytes=3018133, idle_timeout=10, priority=0 actions=CONTROLLER:65535
+*** s4 ------------------------------------------------------------------------
+ cookie=0x0, duration=47.014s, table=0, n_packets=85, n_bytes=5100, priority=65535,dl_dst=01:80:c2:00:00:0e,dl_type=0x88cc actions=CONTROLLER:65535
+ cookie=0x0, duration=47.023s, table=0, n_packets=28414, n_bytes=3012319, idle_timeout=10, priority=0 actions=CONTROLLER:65535
+*** s5 ------------------------------------------------------------------------
+ cookie=0x0, duration=47.025s, table=0, n_packets=86, n_bytes=5160, priority=65535,dl_dst=01:80:c2:00:00:0e,dl_type=0x88cc actions=CONTROLLER:65535
+ cookie=0x0, duration=47.031s, table=0, n_packets=28473, n_bytes=3018228, idle_timeout=10, priority=0 actions=CONTROLLER:65535
+*** s6 ------------------------------------------------------------------------
+ cookie=0x0, duration=47.031s, table=0, n_packets=84, n_bytes=5040, priority=65535,dl_dst=01:80:c2:00:00:0e,dl_type=0x88cc actions=CONTROLLER:65535
+ cookie=0x0, duration=47.039s, table=0, n_packets=28469, n_bytes=3017810, idle_timeout=10, priority=0 actions=CONTROLLER:65535
+
+
+
+Bonus Part:
+
+mininet> h2 iperf -s -u -i 1 &
+mininet> h1 iperf -c 10.0.0.2 -u -b 8M -t 10  &
+mininet> h1 iperf -c 10.0.0.2 -u -b 1M -t 10  &
+
+From CONTROLLER
+PacketIn: UDP 10.0.0.1:60651 -> 10.0.0.2:5001 on switch 1
+Path [1, 3, 5, 6] has a utilization of 0
+Path [1, 2, 4, 6] has a utilization of 0
+Selected path for flow 10.0.0.1:60651 -> 10.0.0.2:5001 is [1, 3, 5, 6]
+Installing FORWARD path flows for 10.0.0.1:60651 -> 10.0.0.2:5001
+Installing REVERSE path flows for 10.0.0.1:60651 <- 10.0.0.2:5001
+PacketIn: UDP 10.0.0.1:60651 -> 10.0.0.2:5001 on switch 1
+Path [1, 3, 5, 6] has a utilization of 3
+Path [1, 2, 4, 6] has a utilization of 0
+Selected path for flow 10.0.0.1:60651 -> 10.0.0.2:5001 is [1, 2, 4, 6]
+Installing FORWARD path flows for 10.0.0.1:60651 -> 10.0.0.2:5001
+Installing REVERSE path flows for 10.0.0.1:60651 <- 10.0.0.2:5001
+PacketIn: UDP 10.0.0.1:60651 -> 10.0.0.2:5001 on switch 1
+Path [1, 3, 5, 6] has a utilization of 3
+Path [1, 2, 4, 6] has a utilization of 3
+Selected path for flow 10.0.0.1:60651 -> 10.0.0.2:5001 is [1, 3, 5, 6]
+Installing FORWARD path flows for 10.0.0.1:60651 -> 10.0.0.2:5001
+Installing REVERSE path flows for 10.0.0.1:60651 <- 10.0.0.2:5001
+PacketIn: UDP 10.0.0.1:60651 -> 10.0.0.2:5001 on switch 1
+Path [1, 3, 5, 6] has a utilization of 6
+Path [1, 2, 4, 6] has a utilization of 3
+Selected path for flow 10.0.0.1:60651 -> 10.0.0.2:5001 is [1, 2, 4, 6]
+Installing FORWARD path flows for 10.0.0.1:60651 -> 10.0.0.2:5001
+Installing REVERSE path flows for 10.0.0.1:60651 <- 10.0.0.2:5001
+PacketIn: UDP 10.0.0.1:60651 -> 10.0.0.2:5001 on switch 1
+Path [1, 3, 5, 6] has a utilization of 6
+Path [1, 2, 4, 6] has a utilization of 6
+
+
+Both End up Maintaining their own Bandwidth
+------------------------------------------------------------
+Client connecting to 10.0.0.2, UDP port 5001
+Sending 1470 byte datagrams, IPG target: 1401.90 us (kalman adjust)
+UDP buffer size:  208 KByte (default)
+------------------------------------------------------------
+[  1] local 10.0.0.1 port 60651 connected with 10.0.0.2 port 5001
+------------------------------------------------------------
+Client connecting to 10.0.0.2, UDP port 5001
+Sending 1470 byte datagrams, IPG target: 11215.21 us (kalman adjust)
+UDP buffer size:  208 KByte (default)
+------------------------------------------------------------
+[  1] local 10.0.0.1 port 59662 connected with 10.0.0.2 port 5001
+[ ID] Interval       Transfer     Bandwidth
+[  1] 0.0000-10.0027 sec  10.0 MBytes  8.39 Mbits/sec
+[  1] Sent 7138 datagrams
+[  1] Server Report:
+[ ID] Interval       Transfer     Bandwidth        Jitter   Lost/Total Datagrams
+[  1] 0.0000-9.7704 sec  10.0 MBytes  8.59 Mbits/sec   0.123 ms 0/7137 (0%)
+[  1] 0.0000-9.7704 sec  183 datagrams received out-of-order
+[ ID] Interval       Transfer     Bandwidth
+[  1] 0.0000-10.0153 sec  1.25 MBytes  1.05 Mbits/sec
+[  1] Sent 896 datagrams
+[  1] Server Report:
+[ ID] Interval       Transfer     Bandwidth        Jitter   Lost/Total Datagrams
+[  1] 0.0000-0.0101 sec  2.87 KBytes  2.33 Mbits/sec   0.631 ms 1005/1007 (1e+02%)

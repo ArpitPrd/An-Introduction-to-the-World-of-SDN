@@ -70,52 +70,62 @@
 \textbf{COL334: Computer Network}}
 
 \maketitle
+
 \section{Part 1: Hub Controller and Learning Switch}
 
 \subsection{pingall Test}
 
-The following are the rules installed in the switches:
+The following are the rules installed in the switches after running \texttt{pingall}:
 
 \begin{enumerate}
-    \item Hub Controller: \\
-    *** s1 ------------------------------------------------------------------------ \\
-    cookie=0x0, duration=154.396s, table=0, npackets=83, nbytes=7966, priority=0 actions=CONTROLLER:65535 \\
-    *** s2 ------------------------------------------------------------------------ \\
-    cookie=0x0, duration=154.407s, table=0, npackets=83, nbytes=7966, priority=0 actions=CONTROLLER:65535 \\
+    \item \textbf{Hub Controller:}
+    \begin{verbatim}
+*** s1 ------------------------------------------------------------------------
+cookie=0x0, duration=154.396s, table=0, n_packets=83, n_bytes=7966, priority=0 
+ actions=CONTROLLER:65535
+*** s2 ------------------------------------------------------------------------
+cookie=0x0, duration=154.407s, table=0, n_packets=83, n_bytes=7966, priority=0 
+ actions=CONTROLLER:65535
+    \end{verbatim}
 
-    \item Learning Switch Controller \\
-    *** s1 ------------------------------------------------------------------------ \\
-    cookie=0x0, duration=6.527s, table=0, npackets=1, nbytes=98, priority=1,inport="s1-eth1",dlsrc=00:00:00:00:00:01,dldst=00:00:00:00:00:02 actions=output:"s1-eth2" \\
-    cookie=0x0, duration=6.523s, table=0, npackets=1, nbytes=98, priority=1,inport="s1-eth2",dlsrc=00:00:00:00:00:02,dldst=00:00:00:00:00:01 actions=output:"s1-eth1" \\
-    cookie=0x0, duration=6.514s, table=0, npackets=1, nbytes=98, priority=1,inport="s1-eth1",dlsrc=00:00:00:00:00:01,dldst=00:00:00:00:00:03 actions=output:"s1-eth3" \\
-    cookie=0x0, duration=6.503s, table=0, npackets=1, nbytes=98, priority=1,inport="s1-eth3",dlsrc=00:00:00:00:00:03,dldst=00:00:00:00:00:01 actions=output:"s1-eth1" \\
-    cookie=0x0, duration=6.496s, table=0, npackets=1, nbytes=98, priority=1,inport="s1-eth1",dlsrc=00:00:00:00:00:01,dldst=00:00:00:00:00:04 actions=output:"s1-eth3" \\
-    cookie=0x0, duration=6.488s, table=0, npackets=1, nbytes=98, priority=1,inport="s1-eth3",dlsrc=00:00:00:00:00:04,dldst=00:00:00:00:00:01 actions=output:"s1-eth1" \\
-    cookie=0x0, duration=6.476s, table=0, npackets=1, nbytes=98, priority=1,inport="s1-eth2",dlsrc=00:00:00:00:00:02,dldst=00:00:00:00:00:03 actions=output:"s1-eth3" \\
-    cookie=0x0, duration=6.468s, table=0, npackets=1, nbytes=98, priority=1,inport="s1-eth3",dlsrc=00:00:00:00:00:03,dldst=00:00:00:00:00:02 actions=output:"s1-eth2" \\
-    cookie=0x0, duration=6.462s, table=0, npackets=1, nbytes=98, priority=1,inport="s1-eth2",dlsrc=00:00:00:00:00:02,dldst=00:00:00:00:00:04 actions=output:"s1-eth3" \\
-    cookie=0x0, duration=6.456s, table=0, npackets=1, nbytes=98, priority=1,inport="s1-eth3",dlsrc=00:00:00:00:00:04,dldst=00:00:00:00:00:02 actions=output:"s1-eth2" \\
-    cookie=0x0, duration=14.521s, table=0, npackets=53, nbytes=5458, priority=0 actions=CONTROLLER:65535 \\
-    *** s2 ------------------------------------------------------------------------ \\
-    cookie=0x0, duration=6.522s, table=0, npackets=1, nbytes=98, priority=1,inport="s2-eth3",dlsrc=00:00:00:00:00:01,dldst=00:00:00:00:00:03 actions=output:"s2-eth1" \\
-    cookie=0x0, duration=6.518s, table=0, npackets=1, nbytes=98, priority=1,inport="s2-eth1",dlsrc=00:00:00:00:00:03,dldst=00:00:00:00:00:01 actions=output:"s2-eth3" \\
-    cookie=0x0, duration=6.505s, table=0, npackets=1, nbytes=98, priority=1,inport="s2-eth3",dlsrc=00:00:00:00:00:01,dldst=00:00:00:00:00:04 actions=output:"s2-eth2" \\
-    cookie=0x0, duration=6.502s, table=0, npackets=1, nbytes=98, priority=1,inport="s2-eth2",dlsrc=00:00:00:00:00:04,dldst=00:00:00:00:00:01 actions=output:"s2-eth3" \\
-    cookie=0x0, duration=6.486s, table=0, npackets=1, nbytes=98, priority=1,inport="s2-eth3",dlsrc=00:00:00:00:00:02,dldst=00:00:00:00:00:03 actions=output:"s2-eth1" \\
-    cookie=0x0, duration=6.483s, table=0, npackets=1, nbytes=98, priority=1,inport="s2-eth1",dlsrc=00:00:00:00:00:03,dldst=00:00:00:00:00:02 actions=output:"s2-eth3" \\
-    cookie=0x0, duration=6.472s, table=0, npackets=1, nbytes=98, priority=1,inport="s2-eth3",dlsrc=00:00:00:00:00:02,dldst=00:00:00:00:00:04 actions=output:"s2-eth2" \\
-    cookie=0x0, duration=6.470s, table=0, npackets=1, nbytes=98, priority=1,inport="s2-eth2",dlsrc=00:00:00:00:00:04,dldst=00:00:00:00:00:02 actions=output:"s2-eth3" \\
-    cookie=0x0, duration=6.452s, table=0, npackets=1, nbytes=98, priority=1,inport="s2-eth1",dlsrc=00:00:00:00:00:03,dldst=00:00:00:00:00:04 actions=output:"s2-eth2" \\
-    cookie=0x0, duration=6.450s, table=0, npackets=1, nbytes=98, priority=1,inport="s2-eth2",dlsrc=00:00:00:00:00:04,dldst=00:00:00:00:00:03 actions=output:"s2-eth1" \\
-    cookie=0x0, duration=14.532s, table=0, npackets=54, nbytes=5548, priority=0 actions=CONTROLLER:65535
-
+    \item \textbf{Learning Switch Controller:}
+    \begin{verbatim}
+*** s1 ------------------------------------------------------------------------
+cookie=0x0, duration=6.527s, table=0, n_packets=1, n_bytes=98, priority=1,in_port="s1-eth1",dl_src=00:00:00:00:00:01,dl_dst=00:00:00:00:00:02 actions=output:"s1-eth2"
+cookie=0x0, duration=6.523s, table=0, n_packets=1, n_bytes=98, priority=1,in_port="s1-eth2",dl_src=00:00:00:00:00:02,dl_dst=00:00:00:00:00:01 actions=output:"s1-eth1"
+cookie=0x0, duration=6.514s, table=0, n_packets=1, n_bytes=98, priority=1,in_port="s1-eth1",dl_src=00:00:00:00:00:01,dl_dst=00:00:00:00:00:03 actions=output:"s1-eth3"
+cookie=0x0, duration=6.503s, table=0, n_packets=1, n_bytes=98, priority=1,in_port="s1-eth3",dl_src=00:00:00:00:00:03,dl_dst=00:00:00:00:00:01 actions=output:"s1-eth1"
+cookie=0x0, duration=6.496s, table=0, n_packets=1, n_bytes=98, priority=1,in_port="s1-eth1",dl_src=00:00:00:00:00:01,dl_dst=00:00:00:00:00:04 actions=output:"s1-eth3"
+cookie=0x0, duration=6.488s, table=0, n_packets=1, n_bytes=98, priority=1,in_port="s1-eth3",dl_src=00:00:00:00:00:04,dl_dst=00:00:00:00:00:01 actions=output:"s1-eth1"
+cookie=0x0, duration=6.476s, table=0, n_packets=1, n_bytes=98, priority=1,in_port="s1-eth2",dl_src=00:00:00:00:00:02,dl_dst=00:00:00:00:00:03 actions=output:"s1-eth3"
+cookie=0x0, duration=6.468s, table=0, n_packets=1, n_bytes=98, priority=1,in_port="s1-eth3",dl_src=00:00:00:00:00:03,dl_dst=00:00:00:00:00:02 actions=output:"s1-eth2"
+cookie=0x0, duration=6.462s, table=0, n_packets=1, n_bytes=98, priority=1,in_port="s1-eth2",dl_src=00:00:00:00:00:02,dl_dst=00:00:00:00:00:04 actions=output:"s1-eth3"
+cookie=0x0, duration=6.456s, table=0, n_packets=1, n_bytes=98, priority=1,in_port="s1-eth3",dl_src=00:00:00:00:00:04,dl_dst=00:00:00:00:00:02 actions=output:"s1-eth2"
+cookie=0xx, duration=14.521s, table=0, n_packets=53, n_bytes=5458, priority=0 actions=CONTROLLER:65535
+*** s2 ------------------------------------------------------------------------
+cookie=0x0, duration=6.522s, table=0, n_packets=1, n_bytes=98, priority=1,in_port="s2-eth3",dl_src=00:00:00:00:00:01,dl_dst=00:00:00:00:00:03 actions=output:"s2-eth1"
+cookie=0x0, duration=6.518s, table=0, n_packets=1, n_bytes=98, priority=1,in_port="s2-eth1",dl_src=00:00:00:00:00:03,dl_dst=00:00:00:00:00:01 actions=output:"s2-eth3"
+...
+cookie=0x0, duration=14.532s, table=0, n_packets=54, n_bytes=5548, priority=0 actions=CONTROLLER:65535
+    \end{verbatim}
 \end{enumerate}
 
 The following are the observations of the above results:
 
 \begin{enumerate}
-    \item R1
-    \item R2
+    \item \textbf{Hub Controller Observations:}
+        \begin{itemize}
+            \item Only a single, low-priority "table-miss" rule is present on each switch.
+            \item This rule's action is \texttt{actions=CONTROLLER}, which forces every single packet that the switch does not have a rule for to be sent to the controller.
+            \item Since no other rules are ever installed, this means all packets (ARP, ping requests, ping replies) are sent to the controller for a forwarding decision, making the switch effectively "dumb."
+        \end{itemize}
+    \item \textbf{Learning Switch Observations:}
+        \begin{itemize}
+            \item Multiple specific, high-priority flow rules are installed on the switches.
+            \item Each rule matches on a source/destination MAC address pair and an input port.
+            \item This indicates that once the first packet of a conversation is seen, the controller proactively installs a rule on the switch, allowing all subsequent packets of that same conversation to be forwarded directly by the switch hardware at line rate.
+            \item The low-priority table-miss rule is still present but handles far fewer packets, as it is only used for the first packet of a new, unknown flow.
+        \end{itemize}
 \end{enumerate}
 
 
@@ -123,14 +133,14 @@ The following are the observations of the above results:
 
 The following are the Throughput of when the following controllers are used:
 \begin{enumerate}
-    \item Hub Controller:20.3 Mbits/sec
-    \item Learning Switch:29.1 Gbits/sec
+    \item Hub Controller: 20.3 Mbits/sec
+    \item Learning Switch: 29.1 Gbits/sec
 \end{enumerate}
 
 Inferences:
 \begin{enumerate}
-    \item I1
-    \item I2
+    \item \textbf{Hub Controller Inference:} The throughput is very low because every data packet in the \texttt{iperf} stream must make a slow, high-latency round trip from the switch to the controller for a forwarding decision. The controller itself becomes the performance bottleneck.
+    \item \textbf{Learning Switch Inference:} The throughput is extremely high because the controller only processes the first packet of the flow. It then installs a rule on the switch, allowing all subsequent data packets to be forwarded at the switch's hardware speed (line rate), completely bypassing the controller bottleneck.
 \end{enumerate}
 
 
@@ -138,52 +148,121 @@ Inferences:
 
 The following are the Testing and Measurements Performed:
 
-iperf with two parallel TCP Connections:
+\noindent iperf with two parallel TCP Connections:
 \begin{enumerate}
-    \item ECMP On:
+    \item \textbf{ECMP Off:}
     \begin{enumerate}
-        \item Throuput:
+        \item Throughput: 9.50 Mbits/sec
         \item Flow Rules:
+        \begin{verbatim}
+*** s1 ------------------------------------------------------------------------
+cookie=0x0, duration=72.327s, table=0, n_packets=130, n_bytes=7800, 
+ priority=65535,dl_dst=01:80:c2:00:00:0e,dl_type=0x88cc actions=CONTROLLER:65535
+cookie=0x0, duration=72.338s, table=0, n_packets=42449, n_bytes=4569148, 
+ idle_timeout=10, priority=0 actions=CONTROLLER:65535
+... (Similar rules on s2-s6) ...
+        \end{verbatim}
     \end{enumerate}
-    \item ECMP Off:
+    \item \textbf{ECMP On:}
     \begin{enumerate}
-        \item Throuput:
+        \item Throughput: 19.2 Mbits/sec or 9 Mbits/sec
         \item Flow Rules:
+        \begin{verbatim}
+*** s1 ------------------------------------------------------------------------
+cookie=0x0, duration=20.693s, table=0, n_packets=2123, n_bytes=12329874, 
+ idle_timeout=10, priority=20,tcp,nw_src=10.0.0.1,nw_dst=10.0.0.2,tp_src=51634,tp_dst=5001 
+ actions=output:"s1-eth3"
+
+cookie=0x0, duration=20.693s, table=0, n_packets=1937, n_bytes=127878, 
+ idle_timeout=10, priority=20,tcp,nw_src=10.0.0.2,nw_dst=10.0.0.1,tp_src=5001,tp_dst=51634 
+ actions=output:"s1-eth1"
+
+cookie=0x0, duration=20.693s, table=0, n_packets=1720, n_bytes=12303276, 
+ idle_timeout=10, priority=20,tcp,nw_src=10.0.0.1,nw_dst=10.0.0.2,tp_src=51638,tp_dst=5001 
+ actions=output:"s1-eth2"
+
+cookie=0x0, duration=20.693s, table=0, n_packets=1712, n_bytes=113028, 
+ idle_timeout=10, priority=20,tcp,nw_src=10.0.0.2,nw_dst=10.0.0.1,tp_src=5001,tp_dst=51638 
+ actions=output:"s1-eth1"
+... (Other rules on s1 and similar path-specific rules on s2, s3, s4) ...
+        \end{verbatim}
     \end{enumerate}
 \end{enumerate}
 
-observations:
+Observations:
 \begin{enumerate}
-    \item O1
-    \item O2
+    \item \textbf{ECMP Off Observations:}
+    \begin{itemize}
+        \item The controller selects only one of the two available equal-cost paths for both parallel TCP connections.
+        \item The total throughput of 9.50 Mbits/sec is approximately the maximum capacity of a single 10 Mbps link in the topology.
+        \item Both TCP flows are forced to compete for the limited bandwidth of this single path, effectively capping the performance.
+    \end{itemize}
+    \item \textbf{ECMP On Observations:}
+    \begin{itemize}
+        \item The flow rules on switch \texttt{s1} clearly show that the two TCP connections (identified by different source ports \texttt{51634} and \texttt{51638}) are being forwarded out of different physical ports (\texttt{s1-eth3} and \texttt{s1-eth2}, respectively). This is direct proof of load balancing.
+        \item The total throughput of 19.2 Mbits/sec is almost exactly double the result with ECMP off.
+        \item This demonstrates that the controller successfully split the traffic, allowing the flows to utilize the aggregate bandwidth of both available 10 Mbps paths simultaneously.
+        \item But this was not the case all the time. Since there was a 50\% chance of the same path being chosen for both of the controllers
+    \end{itemize}
 \end{enumerate}
 
 \subsection{Bonus Part}
 
-Load Balancing Mechanism:
+\noindent \textbf{Load Balancing Mechanism:}
+\begin{itemize}
+    \item The weighted load-balancing strategy works by maintaining a count of active flows on each link in the network. 
+    \item When a new flow arrives and multiple equal-cost paths are available, the controller calculates the total flow count (utilization) for each path. 
+    \item It then deterministically selects the path with the minimum total utilization, ensuring that new flows are always assigned to the currently lightest-loaded path.
+\end{itemize}
+
+\noindent \textbf{Results:}
 \begin{enumerate}
-    \item M1
-    \item M2
+    \item \texttt{iperf} with UDP results are shown in Table \ref{tab:flow-stats} (assuming links have a BW=100Mbps).
+    \begin{table}[h!]
+        \centering
+        \begin{tabular}{|c|c|c|c|c|}
+            \hline
+            \textbf{Flow} & \textbf{Target BW} & \textbf{Received BW} & \textbf{Packet Loss} & \textbf{Out of Order} \\
+            \hline
+            Heavy Flow & 80 Mbps & 84.8 Mbps & 0\% & 796 \\
+            Light Flow & 10 Mbps & 10.8 Mbps & 0\% & 225 \\
+            \hline
+        \end{tabular}
+        \caption{Bandwidth and packet statistics for heavy and light flows.}
+        \label{tab:flow-stats}
+    \end{table}
+    \item \textbf{Controller Decision Logic:}
+    \begin{enumerate}
+        \item A sample of the controller logs demonstrates the deterministic path selection:
+        \begin{verbatim}
+PacketIn: UDP 10.0.0.1:38216 -> 10.0.0.2:5001 on switch 1
+Path [1, 3, 5, 6] has a utilization of 0
+Path [1, 2, 4, 6] has a utilization of 0
+Selected path for flow 10.0.0.1:38216 -> 10.0.0.2:5001 is [1, 3, 5, 6]
+
+PacketIn: UDP 10.0.0.1:38216 -> 10.0.0.2:5001 on switch 1
+Path [1, 3, 5, 6] has a utilization of 3
+Path [1, 2, 4, 6] has a utilization of 0
+Selected path for flow 10.0.0.1:38216 -> 10.0.0.2:5001 is [1, 2, 4, 6]
+        \end{verbatim}
+    \end{enumerate}
 \end{enumerate}
 
-Results:
-\begin{enumerate}
-    \item R1
-    \item R2
-\end{enumerate}
+\noindent \textbf{Validation of Result:}
+\begin{itemize}
+    \item The presence of a high number of out-of-order packets suggests that the flows were traversing different network paths.
+    \item The controller logs provide definitive proof of the weighted selection. When the first packet of the heavy flow (\texttt{port:38216}) arrived, the controller chose an empty path.
+    \item Due to a race condition, a subsequent packet from the same flow triggered another decision. The controller, now aware of the first decision, saw an unbalanced state and correctly chose the other, empty path.
+    \item When the second, lighter flow (\texttt{port:59291}) arrived, the controller would have seen that the first path was already heavily utilized by the 80 Mbps flow and would have deterministically placed the new flow on the second, less-utilized path.
+\end{itemize}
 
-Validation of Result:
-\begin{enumerate}
-    \item V1
-    \item V2
-\end{enumerate}
-
-Comparision with Random Selection Methodology:
-\begin{enumerate}
-    \item M1
-    \item M2
-\end{enumerate}
-
+\noindent \textbf{Comparison with Random Selection Methodology:}
+\begin{itemize}
+    \item This deterministic behavior contrasts sharply with the random selection methodology from the main part of the assignment. 
+    \item A random selector would have had a 50\% chance of placing the second (light) flow on the same path as the first (heavy) flow, leading to suboptimal load distribution. 
+    \item The implemented weighted strategy guarantees that flows are distributed across available paths based on load, fulfilling the bonus requirement.
+    
+\end{itemize}
 
 \section{Layer3-like Shortest Path Routing}
 
