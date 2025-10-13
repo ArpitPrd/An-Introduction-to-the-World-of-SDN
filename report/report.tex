@@ -1,0 +1,234 @@
+% --------------------------------------------------------------
+% This is all preamble stuff that you don't have to worry about.
+% Head down to where it says "Start here"
+% --------------------------------------------------------------
+ 
+\documentclass[12pt]{article}
+ 
+\usepackage[margin=1in]{geometry} 
+\usepackage{amsmath,amsthm,amssymb}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{stackengine}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\graphicspath{{/home/arpit/Desktop/iitd/sem_7/COL334/projects/Getting-To-Know-Network-Traffic/img}}
+
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+ 
+\newenvironment{theorem}[2][Theorem]{\begin{trivlist}
+\item[\hskip \labelsep {\bfseries #1}\hskip \labelsep {\bfseries #2.}]}{\end{trivlist}}
+\newenvironment{lemma}[2][Lemma]{\begin{trivlist}
+\item[\hskip \labelsep {\bfseries #1}\hskip \labelsep {\bfseries #2.}]}{\end{trivlist}}
+\newenvironment{exercise}[2][Exercise]{\begin{trivlist}
+\item[\hskip \labelsep {\bfseries #1}\hskip \labelsep {\bfseries #2.}]}{\end{trivlist}}
+\newenvironment{problem}[2][Problem]{\begin{trivlist}
+\item[\hskip \labelsep {\bfseries #1}\hskip \labelsep {\bfseries #2.}]}{\end{trivlist}}
+\newenvironment{question}[2][Question]{\begin{trivlist}
+\item[\hskip \labelsep {\bfseries #1}\hskip \labelsep {\bfseries #2.}]}{\end{trivlist}}
+\newenvironment{corollary}[2][Corollary]{\begin{trivlist}
+\item[\hskip \labelsep {\bfseries #1}\hskip \labelsep {\bfseries #2.}]}{\end{trivlist}}
+
+\newenvironment{solution}{\begin{proof}[Solution]}{\end{proof}}
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+\lstset{style=mystyle}
+\begin{document}
+ 
+% --------------------------------------------------------------
+%                         Start here
+% --------------------------------------------------------------
+ 
+\title{\textbf{Assignment 3: An Introduction to the World of SDN}}
+\author{Arpit Prasad and Akshat Bhasin\\ 2022EE11837 and 2022EE31996 \\
+\textbf{COL334: Computer Network}}
+
+\maketitle
+\section{Part 1: Hub Controller and Learning Switch}
+
+\subsection{pingall Test}
+
+The following are the rules installed in the switches:
+
+\begin{enumerate}
+    \item Hub Controller: \\
+    *** s1 ------------------------------------------------------------------------ \\
+    cookie=0x0, duration=154.396s, table=0, npackets=83, nbytes=7966, priority=0 actions=CONTROLLER:65535 \\
+    *** s2 ------------------------------------------------------------------------ \\
+    cookie=0x0, duration=154.407s, table=0, npackets=83, nbytes=7966, priority=0 actions=CONTROLLER:65535 \\
+
+    \item Learning Switch Controller \\
+    *** s1 ------------------------------------------------------------------------ \\
+    cookie=0x0, duration=6.527s, table=0, npackets=1, nbytes=98, priority=1,inport="s1-eth1",dlsrc=00:00:00:00:00:01,dldst=00:00:00:00:00:02 actions=output:"s1-eth2" \\
+    cookie=0x0, duration=6.523s, table=0, npackets=1, nbytes=98, priority=1,inport="s1-eth2",dlsrc=00:00:00:00:00:02,dldst=00:00:00:00:00:01 actions=output:"s1-eth1" \\
+    cookie=0x0, duration=6.514s, table=0, npackets=1, nbytes=98, priority=1,inport="s1-eth1",dlsrc=00:00:00:00:00:01,dldst=00:00:00:00:00:03 actions=output:"s1-eth3" \\
+    cookie=0x0, duration=6.503s, table=0, npackets=1, nbytes=98, priority=1,inport="s1-eth3",dlsrc=00:00:00:00:00:03,dldst=00:00:00:00:00:01 actions=output:"s1-eth1" \\
+    cookie=0x0, duration=6.496s, table=0, npackets=1, nbytes=98, priority=1,inport="s1-eth1",dlsrc=00:00:00:00:00:01,dldst=00:00:00:00:00:04 actions=output:"s1-eth3" \\
+    cookie=0x0, duration=6.488s, table=0, npackets=1, nbytes=98, priority=1,inport="s1-eth3",dlsrc=00:00:00:00:00:04,dldst=00:00:00:00:00:01 actions=output:"s1-eth1" \\
+    cookie=0x0, duration=6.476s, table=0, npackets=1, nbytes=98, priority=1,inport="s1-eth2",dlsrc=00:00:00:00:00:02,dldst=00:00:00:00:00:03 actions=output:"s1-eth3" \\
+    cookie=0x0, duration=6.468s, table=0, npackets=1, nbytes=98, priority=1,inport="s1-eth3",dlsrc=00:00:00:00:00:03,dldst=00:00:00:00:00:02 actions=output:"s1-eth2" \\
+    cookie=0x0, duration=6.462s, table=0, npackets=1, nbytes=98, priority=1,inport="s1-eth2",dlsrc=00:00:00:00:00:02,dldst=00:00:00:00:00:04 actions=output:"s1-eth3" \\
+    cookie=0x0, duration=6.456s, table=0, npackets=1, nbytes=98, priority=1,inport="s1-eth3",dlsrc=00:00:00:00:00:04,dldst=00:00:00:00:00:02 actions=output:"s1-eth2" \\
+    cookie=0x0, duration=14.521s, table=0, npackets=53, nbytes=5458, priority=0 actions=CONTROLLER:65535 \\
+    *** s2 ------------------------------------------------------------------------ \\
+    cookie=0x0, duration=6.522s, table=0, npackets=1, nbytes=98, priority=1,inport="s2-eth3",dlsrc=00:00:00:00:00:01,dldst=00:00:00:00:00:03 actions=output:"s2-eth1" \\
+    cookie=0x0, duration=6.518s, table=0, npackets=1, nbytes=98, priority=1,inport="s2-eth1",dlsrc=00:00:00:00:00:03,dldst=00:00:00:00:00:01 actions=output:"s2-eth3" \\
+    cookie=0x0, duration=6.505s, table=0, npackets=1, nbytes=98, priority=1,inport="s2-eth3",dlsrc=00:00:00:00:00:01,dldst=00:00:00:00:00:04 actions=output:"s2-eth2" \\
+    cookie=0x0, duration=6.502s, table=0, npackets=1, nbytes=98, priority=1,inport="s2-eth2",dlsrc=00:00:00:00:00:04,dldst=00:00:00:00:00:01 actions=output:"s2-eth3" \\
+    cookie=0x0, duration=6.486s, table=0, npackets=1, nbytes=98, priority=1,inport="s2-eth3",dlsrc=00:00:00:00:00:02,dldst=00:00:00:00:00:03 actions=output:"s2-eth1" \\
+    cookie=0x0, duration=6.483s, table=0, npackets=1, nbytes=98, priority=1,inport="s2-eth1",dlsrc=00:00:00:00:00:03,dldst=00:00:00:00:00:02 actions=output:"s2-eth3" \\
+    cookie=0x0, duration=6.472s, table=0, npackets=1, nbytes=98, priority=1,inport="s2-eth3",dlsrc=00:00:00:00:00:02,dldst=00:00:00:00:00:04 actions=output:"s2-eth2" \\
+    cookie=0x0, duration=6.470s, table=0, npackets=1, nbytes=98, priority=1,inport="s2-eth2",dlsrc=00:00:00:00:00:04,dldst=00:00:00:00:00:02 actions=output:"s2-eth3" \\
+    cookie=0x0, duration=6.452s, table=0, npackets=1, nbytes=98, priority=1,inport="s2-eth1",dlsrc=00:00:00:00:00:03,dldst=00:00:00:00:00:04 actions=output:"s2-eth2" \\
+    cookie=0x0, duration=6.450s, table=0, npackets=1, nbytes=98, priority=1,inport="s2-eth2",dlsrc=00:00:00:00:00:04,dldst=00:00:00:00:00:03 actions=output:"s2-eth1" \\
+    cookie=0x0, duration=14.532s, table=0, npackets=54, nbytes=5548, priority=0 actions=CONTROLLER:65535
+
+\end{enumerate}
+
+The following are the observations of the above results:
+
+\begin{enumerate}
+    \item R1
+    \item R2
+\end{enumerate}
+
+
+\subsection{Throughput Test}
+
+The following are the Throughput of when the following controllers are used:
+\begin{enumerate}
+    \item Hub Controller:20.3 Mbits/sec
+    \item Learning Switch:29.1 Gbits/sec
+\end{enumerate}
+
+Inferences:
+\begin{enumerate}
+    \item I1
+    \item I2
+\end{enumerate}
+
+
+\section{Part 2: Layer2-like Shortest Path Routing}
+
+The following are the Testing and Measurements Performed:
+
+iperf with two parallel TCP Connections:
+\begin{enumerate}
+    \item ECMP On:
+    \begin{enumerate}
+        \item Throuput:
+        \item Flow Rules:
+    \end{enumerate}
+    \item ECMP Off:
+    \begin{enumerate}
+        \item Throuput:
+        \item Flow Rules:
+    \end{enumerate}
+\end{enumerate}
+
+observations:
+\begin{enumerate}
+    \item O1
+    \item O2
+\end{enumerate}
+
+\subsection{Bonus Part}
+
+Load Balancing Mechanism:
+\begin{enumerate}
+    \item M1
+    \item M2
+\end{enumerate}
+
+Results:
+\begin{enumerate}
+    \item R1
+    \item R2
+\end{enumerate}
+
+Validation of Result:
+\begin{enumerate}
+    \item V1
+    \item V2
+\end{enumerate}
+
+Comparision with Random Selection Methodology:
+\begin{enumerate}
+    \item M1
+    \item M2
+\end{enumerate}
+
+
+\section{Layer3-like Shortest Path Routing}
+
+The following are the experimenting and reports:
+
+\begin{enumerate}
+    \item h1 ping h2 -c 5
+    \item Rules installed in switches
+\end{enumerate}
+
+Assumptions:
+\begin{enumerate}
+    \item A1
+    \item A2
+\end{enumerate}
+
+
+\section{Part 4: Comparision with Traditional Routing (OSPF)}
+
+Experiments Tested:
+
+iperf result between h1 and h2:
+
+I1
+
+Forwarding Rules:
+\begin{enumerate}
+    \item s1
+    \item S6
+\end{enumerate}
+
+Throughput and Convergence Times:
+\begin{enumerate}
+    \item SDN (mention source)
+    \item OSPF (mention source)
+\end{enumerate}
+
+Explanation of Result:
+\begin{enumerate}
+    \item E1 
+    \item E2
+\end{enumerate}
+
+% --------------------------------------------------------------
+%     You don't have to mess with anything below this line.
+% --------------------------------------------------------------
+
+\end{document}

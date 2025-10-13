@@ -2,8 +2,8 @@ from mininet.topo import Topo
 from mininet.net import Mininet
 from mininet.log import setLogLevel, info
 from mininet.cli import CLI
-from mininet.node import RemoteController, OVSSwitch
 from mininet.link import TCLink
+from mininet.node import RemoteController, OVSSwitch
 
 class CustomTopo(Topo):
     def build(self):
@@ -25,12 +25,12 @@ class CustomTopo(Topo):
         self.addLink(h2, s6)
 
         # Connect switches with each other
-        self.addLink(s1, s2, bw=bw)
-        self.addLink(s1, s3, bw=bw)
-        self.addLink(s2, s4, bw=bw)
-        self.addLink(s3, s5, bw=bw)
-        self.addLink(s4, s6, bw=bw)
-        self.addLink(s5, s6, bw=bw)
+        self.addLink(s1, s2, cls=TCLink, bw=bw)
+        self.addLink(s1, s3, cls=TCLink, bw=bw)
+        self.addLink(s2, s4, cls=TCLink, bw=bw)
+        self.addLink(s3, s5, cls=TCLink, bw=bw)
+        self.addLink(s4, s6, cls=TCLink, bw=bw)
+        self.addLink(s5, s6, cls=TCLink, bw=bw)
         
 def run():
     """Create the network, start it, and enter the CLI."""
@@ -52,4 +52,3 @@ if __name__ == '__main__':
     # Set log level to display Mininet output
     setLogLevel('info')
     run()
-
