@@ -264,53 +264,63 @@ Selected path for flow 10.0.0.1:38216 -> 10.0.0.2:5001 is [1, 2, 4, 6]
     
 \end{itemize}
 
-\section{Layer3-like Shortest Path Routing}
+\section{Part 3: Layer3-like Shortest Path Routing}
 
-The following are the experimenting and reports:
+The following experiments were conducted to validate the L3 routing controller.
 
+\subsection{Ping Test}
+A 5-packet ping test was conducted from host \texttt{h1} to \texttt{h2} to verify inter-subnet connectivity.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.9\textwidth]{p3_ping_c.jpeg}
+    \caption{Controller logs showing ARP and path calculation for the first ping.}
+\end{figure}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.9\textwidth]{p3_ping_m.jpeg}
+    \caption{Mininet CLI showing results of \texttt{h1 ping h2 -c 5}.}
+\end{figure}
+
+\subsubsection*{Observations}
+The successful ping with 0\% packet loss confirms that the controller correctly handles inter-subnet routing. The following latency characteristics were observed:
+\begin{itemize}
+    \item \textbf{Initial Latency:} The first ping has a significantly higher response time (17.8 ms). This is expected behavior as the first packet triggers a table-miss on switch \texttt{s1}, which is sent to the controller. The controller then calculates the shortest path, installs flow rules on all switches along the computed path (\texttt{s1, s2, s4, s6}), and forwards the packet.
+    
+    \item \textbf{Subsequent Latency:} The next four pings are extremely fast ($<$ 0.5 ms). This is because the necessary flow rules are now installed in the data plane of the switches. These packets are processed directly by the switch hardware at line-rate, bypassing the controller and demonstrating the efficiency of the established forwarding path.
+\end{itemize}
+
+\subsection{Installed Flow Rules}
+The flow tables of the switches were dumped after the ping test to inspect the installed rules.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.9\textwidth]{p3_rules.jpeg}
+    \caption{Flow rules installed on switches along the path.}
+\end{figure}
+
+\subsubsection*{Observations}
+The rules confirm the L3 routing behavior:
+\begin{itemize}
+    \item Each rule matches on the destination IP address (\texttt{nw\_dst}) only, emulating a traditional routing table.
+    \item The actions include \texttt{mod\_dl\_src}, \texttt{mod\_dl\_dst} (MAC address rewriting), and \texttt{DEC\_NW\_TTL} (TTL decrement), which are characteristic of a Layer 3 router.
+    \item The final action is \texttt{output:<port>}, forwarding the modified frame to the next hop.
+\end{itemize}
+
+
+\subsection{Assumptions}
+The implementation of the L3 routing controller is based on the following key assumptions:
 \begin{enumerate}
-    \item h1 ping h2 -c 5
-    \begin{figure}[h!]
-        \centering
-        \includegraphics[width=0.8\textwidth]{p3_ping_c.jpeg}
-        \caption{Controller Side Response on h1 ping h2 -c 5}
-    \end{figure}
+    \item \textbf{Static Configuration:} The controller relies entirely on the \texttt{p3\_config.json} file for all network information (topology, IPs, MACs). The configuration is assumed to be accurate and complete. No new links can be added on the fly.
 
-    \begin{figure}[h!]
-        \centering
-        \includegraphics[width=0.8\textwidth]{p3_ping_m.jpeg}
-        \caption{Mininet Side Response on h1 ping h2 -c 5}
-    \end{figure}
-    \item Rules installed in switches
-    \begin{figure}[h!]
-        \centering
-        \includegraphics[width=0.8\textwidth]{p3_rules.jpeg}
-        \caption{Rules installed in the switches}
-    \end{figure}
+    \item \textbf{Centralized ARP Proxy:} The controller intercepts all ARP requests and generates synthetic replies from its static configuration. Hosts do not perform dynamic ARP discovery among themselves.
+
+    \item \textbf{Reactive Path Calculation:} End-to-end paths and their corresponding flow rules are calculated and installed reactively, only upon receiving the first packet of a new flow.
+
+    \item \textbf{Destination-Based Forwarding:} All routing decisions and installed flow rules are based solely on the destination IP address of a packet, consistent with standard IP routing.
 \end{enumerate}
 
-The successful ping with 0% packet loss confirms that the controller correctly routes packets between the two different subnets.
-
-Initial Latency: The first ping has a significantly higher response time (17.8 ms). This is the expected behavior. When this first packet arrives at switch s1, it is sent to the controller because no matching flow rule exists. The controller then:
-
-Calculates the shortest path to h2's switch (s6).
-
-Installs the necessary flow rules on all switches along the path (s1, s2, s3, s6).
-
-Rewrites the packet's MAC address and sends it on its way.
-
-Subsequent Latency: The next four pings are extremely fast (< 0.5 ms). This is because the necessary flow rules are now installed in the data plane of the switches. These packets are processed directly by the switch hardware without any controller intervention, demonstrating the efficiency of SDN once forwarding paths are established.
-
-\textbf{Assumptions:}
-\begin{enumerate}
-    \item Static Configuration: The controller relies entirely on the p3 config file for all network information (topology, IPs, MACs). It is assumed this file is accurate and complete.
-
-    \item Controller First: It is assumed the controller starts and fully builds its internal topology map from the config file before any host-to-host traffic is initiated.
-
-    \item No Dynamic Discovery: The controller does not use dynamic protocols like LLDP. The ARP handling is reactive but relies on a pre-populated table for replies.
-
-    \item IP-Centric Routing: The shortest path logic and flow rule installation are designed specifically for IPv4 traffic. Other protocols are not routed.
-\end{enumerate}
 
 
 \section{Part 4: Comparision with Traditional Routing (OSPF)}
