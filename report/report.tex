@@ -270,13 +270,46 @@ The following are the experimenting and reports:
 
 \begin{enumerate}
     \item h1 ping h2 -c 5
+    \begin{figure}[h!]
+        \centering
+        \includegraphics[width=0.8\textwidth]{p3_ping_c.jpeg}
+        \caption{Controller Side Response on h1 ping h2 -c 5}
+    \end{figure}
+
+    \begin{figure}[h!]
+        \centering
+        \includegraphics[width=0.8\textwidth]{p3_ping_m.jpeg}
+        \caption{Mininet Side Response on h1 ping h2 -c 5}
+    \end{figure}
     \item Rules installed in switches
+    \begin{figure}[h!]
+        \centering
+        \includegraphics[width=0.8\textwidth]{p3_rules.jpeg}
+        \caption{Rules installed in the switches}
+    \end{figure}
 \end{enumerate}
 
-Assumptions:
+The successful ping with 0% packet loss confirms that the controller correctly routes packets between the two different subnets.
+
+Initial Latency: The first ping has a significantly higher response time (17.8 ms). This is the expected behavior. When this first packet arrives at switch s1, it is sent to the controller because no matching flow rule exists. The controller then:
+
+Calculates the shortest path to h2's switch (s6).
+
+Installs the necessary flow rules on all switches along the path (s1, s2, s3, s6).
+
+Rewrites the packet's MAC address and sends it on its way.
+
+Subsequent Latency: The next four pings are extremely fast (< 0.5 ms). This is because the necessary flow rules are now installed in the data plane of the switches. These packets are processed directly by the switch hardware without any controller intervention, demonstrating the efficiency of SDN once forwarding paths are established.
+
+\textbf{Assumptions:}
 \begin{enumerate}
-    \item A1
-    \item A2
+    \item Static Configuration: The controller relies entirely on the p3 config file for all network information (topology, IPs, MACs). It is assumed this file is accurate and complete.
+
+    \item Controller First: It is assumed the controller starts and fully builds its internal topology map from the config file before any host-to-host traffic is initiated.
+
+    \item No Dynamic Discovery: The controller does not use dynamic protocols like LLDP. The ARP handling is reactive but relies on a pre-populated table for replies.
+
+    \item IP-Centric Routing: The shortest path logic and flow rule installation are designed specifically for IPv4 traffic. Other protocols are not routed.
 \end{enumerate}
 
 

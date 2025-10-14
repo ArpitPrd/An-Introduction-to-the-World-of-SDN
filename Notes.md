@@ -92,3 +92,31 @@
 
 
 - Always to --observe-links flag
+
+(ryuenv) baadalvm@baadalvm:~/COL333_A3/AkshatCode/part3$ ryu-manager p3_l3spf.py 
+Traceback (most recent call last):
+  File "/home/baadalvm/COL333_A3/ryuenv/bin/ryu-manager", line 5, in <module>
+    from ryu.cmd.manager import main
+  File "/home/baadalvm/COL333_A3/ryuenv/lib/python3.10/site-packages/ryu/cmd/manager.py", line 22, in <module>
+    from ryu.lib import hub
+  File "/home/baadalvm/COL333_A3/ryuenv/lib/python3.10/site-packages/ryu/lib/hub.py", line 30, in <module>
+    import eventlet
+  File "/home/baadalvm/COL333_A3/ryuenv/lib/python3.10/site-packages/eventlet/__init__.py", line 17, in <module>
+    from eventlet import convenience
+  File "/home/baadalvm/COL333_A3/ryuenv/lib/python3.10/site-packages/eventlet/convenience.py", line 7, in <module>
+    from eventlet.green import socket
+  File "/home/baadalvm/COL333_A3/ryuenv/lib/python3.10/site-packages/eventlet/green/socket.py", line 4, in <module>
+    __import__('eventlet.green._socket_nodns')
+  File "/home/baadalvm/COL333_A3/ryuenv/lib/python3.10/site-packages/eventlet/green/_socket_nodns.py", line 11, in <module>
+    from eventlet import greenio
+  File "/home/baadalvm/COL333_A3/ryuenv/lib/python3.10/site-packages/eventlet/greenio/__init__.py", line 3, in <module>
+    from eventlet.greenio.base import *  # noqa
+  File "/home/baadalvm/COL333_A3/ryuenv/lib/python3.10/site-packages/eventlet/greenio/base.py", line 32, in <module>
+    socket_timeout = eventlet.timeout.wrap_is_timeout(socket.timeout)
+  File "/home/baadalvm/COL333_A3/ryuenv/lib/python3.10/site-packages/eventlet/timeout.py", line 166, in wrap_is_timeout
+    base.is_timeout = property(lambda _: True)
+TypeError: cannot set 'is_timeout' attribute of immutable type 'TimeoutError'
+
+same error, I tjhink the last time you asked to me downgrade my python version, can you do trhat 
+
+use python3.9
