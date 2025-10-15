@@ -1,5 +1,4 @@
 import json
-import random
 from ryu.base import app_manager
 from ryu.controller import ofp_event
 from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER
@@ -8,9 +7,7 @@ from ryu.ofproto import ofproto_v1_3
 from ryu.lib.packet import packet, ethernet, ether_types
 from ryu.topology import event
 from ryu.topology.switches import Switches
-# --- START OF MODIFIED SECTION ---
 from ryu.lib.packet import ipv4, tcp, udp
-# --- END OF MODIFIED SECTION ---
 
 
 import networkx as nx
@@ -25,7 +22,7 @@ class L2SPF(app_manager.RyuApp):
         self.switches = kwargs['switches']
         self.mac_to_port = {}
         self.graph = nx.DiGraph()
-        self.flow_counts = {} # Tracks the number of flows on each link
+        self.flow_counts = {} 
         self.config = {}
         try:
             with open("config.json", 'r') as f:
@@ -38,9 +35,6 @@ class L2SPF(app_manager.RyuApp):
         self.ecmp = self.config.get("ecmp", False)
         self.logger.info("L2SPF Controller Started. Utilization-based ECMP is %s.", "enabled" if self.ecmp else "disabled")
 
-    # ---------------------------
-    # Ryu event handlers
-    # ---------------------------
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
         datapath = ev.msg.datapath
@@ -121,11 +115,9 @@ class L2SPF(app_manager.RyuApp):
             self.logger.info("Learned MAC %s at switch %s, port %s", src_mac, src_dpid, in_port)
 
         ipv4_pkt = pkt.get_protocol(ipv4.ipv4)
-        # --- START OF MODIFIED SECTION ---
         tcp_pkt = pkt.get_protocol(tcp.tcp)
         udp_pkt = pkt.get_protocol(udp.udp)
 
-        # Handle TCP or UDP traffic with the intelligent routing logic
         if ipv4_pkt and (tcp_pkt or udp_pkt):
             src_ip = ipv4_pkt.src
             dst_ip = ipv4_pkt.dst
@@ -135,7 +127,7 @@ class L2SPF(app_manager.RyuApp):
                 src_port = tcp_pkt.src_port
                 dst_port = tcp_pkt.dst_port
                 proto_name = "TCP"
-            else: # udp_pkt must be present
+            else: 
                 l4_proto = ipv4_pkt.proto
                 src_port = udp_pkt.src_port
                 dst_port = udp_pkt.dst_port
@@ -149,10 +141,8 @@ class L2SPF(app_manager.RyuApp):
 
                 if src_dpid == dst_dpid:
                     self.logger.info("Packet is at its destination switch %s. Installing local delivery flow.", src_dpid)
-                    # Pass all protocol info to the installation function
                     self.install_path_flows([], src_mac, dst_mac, src_ip, dst_ip,
                                             l4_proto, src_port, dst_port, in_port, dst_host_port)
-                    # For local delivery, the action is just the host port.
                     actions = [parser.OFPActionOutput(dst_host_port)]
                     self.send_packet_out(datapath, msg, actions)
                     return
@@ -180,15 +170,11 @@ class L2SPF(app_manager.RyuApp):
             else:
                 self.logger.debug("Destination %s unknown. Flooding packet.", dst_mac)
                 self.flood_packet(datapath, msg)
-        # --- END OF MODIFIED SECTION ---
         
         elif dst_mac not in self.mac_to_port:
             self.logger.debug("Destination %s unknown (Non-IP). Flooding packet.", dst_mac)
             self.flood_packet(datapath, msg)
 
-    # ---------------------------
-    # Flow and Packet helpers
-    # ---------------------------
     def add_flow(self, datapath, priority, match, actions, idle_timeout=10, hard_timeout=0):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
@@ -224,13 +210,11 @@ class L2SPF(app_manager.RyuApp):
         return best_path
 
     def _update_flow_counts(self, path):
-        # Forward path
         for i in range(len(path) - 1):
             link = (path[i], path[i+1])
             if link in self.flow_counts:
                 self.flow_counts[link] += 1
         
-        # Reverse path
         reverse_path = list(reversed(path))
         for i in range(len(reverse_path) - 1):
             link = (reverse_path[i], reverse_path[i+1])
@@ -258,15 +242,8 @@ class L2SPF(app_manager.RyuApp):
                                   in_port=in_port, actions=actions, data=msg.data)
         datapath.send_msg(out)
 
-    # --- START OF MODIFIED SECTION ---
     def install_path_flows(self, path, src_mac, dst_mac, src_ip, dst_ip,
                            l4_proto, src_port, dst_port, src_host_port, dst_host_port):
-        """
-        Installs flows for both forward and reverse paths.
-        Dynamically creates matches for TCP (6) or UDP (17).
-        """
-        
-        # --- Helper function to create match ---
         def create_match(parser, ipv4_src, ipv4_dst, l4_proto, port_src, port_dst):
             match_args = {
                 'eth_type': ether_types.ETH_TYPE_IP,
@@ -274,32 +251,28 @@ class L2SPF(app_manager.RyuApp):
                 'ipv4_src': ipv4_src,
                 'ipv4_dst': ipv4_dst
             }
-            if l4_proto == 6: # TCP
+            if l4_proto == 6: 
                 match_args['tcp_src'] = port_src
                 match_args['tcp_dst'] = port_dst
-            elif l4_proto == 17: # UDP
+            elif l4_proto == 17:
                 match_args['udp_src'] = port_src
                 match_args['udp_dst'] = port_dst
             
             return parser.OFPMatch(**match_args)
         
-        # --- Handle special case for local delivery (empty path) ---
         if not path:
             src_dp = self.switches.dps.get(self.mac_to_port[src_mac][0])
             if src_dp:
                 parser = src_dp.ofproto_parser
-                # Install forward flow
                 match = create_match(parser, src_ip, dst_ip, l4_proto, src_port, dst_port)
                 actions = [parser.OFPActionOutput(dst_host_port)]
                 self.add_flow(src_dp, 20, match, actions)
-                # Install reverse flow
                 match_rev = create_match(parser, dst_ip, src_ip, l4_proto, dst_port, src_port)
                 actions_rev = [parser.OFPActionOutput(src_host_port)]
                 self.add_flow(src_dp, 20, match_rev, actions_rev)
             return
 
 
-        # --- 1. Install FORWARD path (src -> dst) ---
         self.logger.info("Installing FORWARD path flows for %s:%s -> %s:%s", src_ip, src_port, dst_ip, dst_port)
         for i in range(len(path) - 1):
             this_dpid = path[i]
@@ -319,7 +292,6 @@ class L2SPF(app_manager.RyuApp):
             actions = [parser.OFPActionOutput(dst_host_port)]
             self.add_flow(dst_dp, 20, match, actions)
 
-        # --- 2. Install REVERSE path (dst -> src) ---
         self.logger.info("Installing REVERSE path flows for %s:%s <- %s:%s", src_ip, src_port, dst_ip, dst_port)
         reverse_path = list(reversed(path))
         for i in range(len(reverse_path) - 1):
@@ -329,7 +301,6 @@ class L2SPF(app_manager.RyuApp):
             dp = self.switches.dps.get(this_dpid)
             if dp:
                 parser = dp.ofproto_parser
-                # Note: src and dst are swapped for the reverse path match
                 match = create_match(parser, dst_ip, src_ip, l4_proto, dst_port, src_port)
                 actions = [parser.OFPActionOutput(out_port)]
                 self.add_flow(dp, 20, match, actions)
@@ -340,4 +311,3 @@ class L2SPF(app_manager.RyuApp):
             match = create_match(parser, dst_ip, src_ip, l4_proto, dst_port, src_port)
             actions = [parser.OFPActionOutput(src_host_port)]
             self.add_flow(src_dp, 20, match, actions)
-    # --- END OF MODIFIED SECTION ---

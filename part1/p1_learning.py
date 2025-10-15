@@ -8,11 +8,6 @@ from ryu.lib.packet import ethernet
 from ryu.lib.packet import ether_types
 
 class LearningController(app_manager.RyuApp):
-    """
-    A simple Hub controller for Part 1 of the assignment.
-    This controller learns MAC addresses but never installs flow rules.
-    Every packet requiring a forwarding decision is sent to the controller.
-    """
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
 
     def __init__(self, *args, **kwargs):
@@ -21,15 +16,10 @@ class LearningController(app_manager.RyuApp):
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
-        """
-        Handles the initial connection of a switch.
-        Installs a default flow rule that sends all packets to the controller.
-        """
         datapath = ev.msg.datapath
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
 
-        # Install table-miss flow entry to send all packets to the controller
         match = parser.OFPMatch()
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
                                           ofproto.OFPCML_NO_BUFFER)]
@@ -37,7 +27,6 @@ class LearningController(app_manager.RyuApp):
         self.logger.info("Switch %s connected and default rule installed.", datapath.id)
 
     def add_flow(self, datapath, priority, match, actions):
-        """Helper to add a flow entry to a switch."""
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
         inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, actions)]
@@ -47,7 +36,6 @@ class LearningController(app_manager.RyuApp):
 
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
-        """Handles incoming packets from the switches."""
         msg = ev.msg
         datapath = msg.datapath
         ofproto = datapath.ofproto
@@ -57,7 +45,6 @@ class LearningController(app_manager.RyuApp):
         pkt = packet.Packet(msg.data)
         eth = pkt.get_protocol(ethernet.ethernet)
 
-        # Ignore LLDP packets used for topology discovery
         if eth.ethertype == ether_types.ETH_TYPE_LLDP:
             return
 
@@ -67,18 +54,13 @@ class LearningController(app_manager.RyuApp):
 
         self.logger.info("Packet in SWITCH %s, SRC %s, DST %s, PORT %s", dpid, src, dst, in_port)
 
-        # Initialize MAC table for the switch if it's new
         self.mac_to_port.setdefault(dpid, {})
 
-        # Learn the source MAC to port mapping
         self.mac_to_port[dpid][src] = in_port
 
-        # Determine the output port
         if dst in self.mac_to_port[dpid]:
-            # If the destination is known, send to the specific port
             out_port = self.mac_to_port[dpid][dst]
         else:
-            # If unknown, flood the packet
             out_port = ofproto.OFPP_FLOOD
 
         actions = [parser.OFPActionOutput(out_port)]
@@ -90,7 +72,6 @@ class LearningController(app_manager.RyuApp):
 
             self.logger.info(f"For Switch {dpid} Controller Installed Flow Rule for {src} to {dst}")
 
-        # Construct and send the PacketOut message
         out = parser.OFPPacketOut(datapath=datapath,
                                   buffer_id=msg.buffer_id,
                                   in_port=in_port,
