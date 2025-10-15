@@ -37,21 +37,21 @@ class L2SPF(app_manager.RyuApp):
 
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
-    def switch_features_handler(self, ev):
-        datapath = ev.msg.datapath
+    def switch_features_handler(self, event):
+        datapath = event.msg.datapath
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
         match = parser.OFPMatch()
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)]
-        self.add_flow(datapath, 0, match, actions)
+        self.install_flow_rule_in_switch(datapath, 0, match, actions)
         self.logger.info("Switch %s connected and table-miss installed.", datapath.id)
 
     @set_ev_cls(event.EventLinkAdd)
-    def handle_link_add(self, ev):
-        src_dpid = ev.link.src.dpid
-        dst_dpid = ev.link.dst.dpid
-        src_port = ev.link.src.port_no
-        dst_port = ev.link.dst.port_no
+    def handle_link_add(self, event):
+        src_dpid = event.link.src.dpid
+        dst_dpid = event.link.dst.dpid
+        src_port = event.link.src.port_no
+        dst_port = event.link.dst.port_no
 
         self.graph.add_node(src_dpid)
         self.graph.add_node(dst_dpid)
@@ -62,48 +62,48 @@ class L2SPF(app_manager.RyuApp):
         if self.weight_matrix:
             max_index = len(self.weight_matrix)
             if 1 <= src_dpid <= max_index and 1 <= dst_dpid <= max_index:
-                w_fwd = self.weight_matrix[src_dpid - 1][dst_dpid - 1]
-                cost_forward = w_fwd if (isinstance(w_fwd, (int, float)) and w_fwd != 0) else 1
+                foward_weight = self.weight_matrix[src_dpid - 1][dst_dpid - 1]
+                cost_forward = foward_weight if (isinstance(foward_weight, (int, float)) and foward_weight != 0) else 1
 
-                w_rev = self.weight_matrix[dst_dpid - 1][src_dpid - 1]
-                cost_reverse = w_rev if (isinstance(w_rev, (int, float)) and w_rev != 0) else 1
+                reverse_weight = self.weight_matrix[dst_dpid - 1][src_dpid - 1]
+                cost_reverse = reverse_weight if (isinstance(reverse_weight, (int, float)) and reverse_weight != 0) else 1
 
         self.graph.add_edge(src_dpid, dst_dpid, port=src_port, weight=cost_forward)
         self.graph.add_edge(dst_dpid, src_dpid, port=dst_port, weight=cost_reverse)
 
-        self.logger.info("Added link: %s:%s (cost:%s) <-> %s:%s (cost:%s).",
+        self.logger.info("New link SwitchId:Port :: %s:%s (cost:%s) <-> %s:%s (cost:%s).",
                          src_dpid, src_port, cost_forward, dst_dpid, dst_port, cost_reverse)
         self.logger.debug("Current edges: %s", list(self.graph.edges(data=True)))
 
     @set_ev_cls(event.EventLinkDelete)
-    def handle_link_delete(self, ev):
-        src_dpid = ev.link.src.dpid
-        dst_dpid = ev.link.dst.dpid
+    def handle_link_delete(self, event):
+        src_dpid = event.link.src.dpid
+        dst_dpid = event.link.dst.dpid
 
         try:
             self.graph.remove_edge(src_dpid, dst_dpid)
             self.graph.remove_edge(dst_dpid, src_dpid)
-            self.logger.info("Removed link between switch %s and %s", src_dpid, dst_dpid)
+            self.logger.info("Rem link between switch %s and %s", src_dpid, dst_dpid)
         except nx.NetworkXError:
-            self.logger.warning("Attempted to remove a non-existent link between %s and %s", src_dpid, dst_dpid)
+            self.logger.warning("Cannot remove a link that that did not exist Logs: between %s and %s", src_dpid, dst_dpid)
 
 
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
-    def _packet_in_handler(self, ev):
-        msg = ev.msg
+    def _packet_in_handler(self, event):
+        msg = event.msg
         datapath = msg.datapath
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
         in_port = msg.match.get('in_port')
 
-        pkt = packet.Packet(msg.data)
-        eth = pkt.get_protocol(ethernet.ethernet)
+        packet_wrapper = packet.Packet(msg.data)
+        ethernet_wrapper = packet_wrapper.get_protocol(ethernet.ethernet)
 
-        if eth.ethertype == ether_types.ETH_TYPE_LLDP:
+        if ethernet_wrapper.ethertype == ether_types.ETH_TYPE_LLDP:
             return
 
-        dst_mac = eth.dst
-        src_mac = eth.src
+        dst_mac = ethernet_wrapper.dst
+        src_mac = ethernet_wrapper.src
         src_dpid = datapath.id
 
         if src_mac not in self.mac_to_port:
@@ -111,22 +111,22 @@ class L2SPF(app_manager.RyuApp):
             self.logger.info("Learned MAC %s at switch %s, port %s", src_mac, src_dpid, in_port)
             
 
-        ipv4_pkt = pkt.get_protocol(ipv4.ipv4)
-        tcp_pkt = pkt.get_protocol(tcp.tcp)
+        ipv4_packet_wrapper = packet_wrapper.get_protocol(ipv4.ipv4)
+        tcp_packet_wrapper = packet_wrapper.get_protocol(tcp.tcp)
 
-        if ipv4_pkt and tcp_pkt:
-            src_ip = ipv4_pkt.src
-            dst_ip = ipv4_pkt.dst
-            src_port = tcp_pkt.src_port
-            dst_port = tcp_pkt.dst_port
+        if ipv4_packet_wrapper and tcp_packet_wrapper:
+            src_ip = ipv4_packet_wrapper.src
+            dst_ip = ipv4_packet_wrapper.dst
+            src_port = tcp_packet_wrapper.src_port
+            dst_port = tcp_packet_wrapper.dst_port
             
-            self.logger.info("PacketIn: TCP %s:%s -> %s:%s on switch %s", src_ip, src_port, dst_ip, dst_port, src_dpid)
+            self.logger.info("Packet Sent for Handling: TCP %s:%s -> %s:%s on switch %s", src_ip, src_port, dst_ip, dst_port, src_dpid)
 
             if dst_mac in self.mac_to_port:
                 dst_dpid, dst_host_port = self.mac_to_port[dst_mac]
 
                 if src_dpid == dst_dpid:
-                    self.logger.info("Packet is at its destination switch %s. Installing local delivery flow.", src_dpid)
+                    self.logger.info("Packet is currently at its final switch %s. Installing local delivery flow.", src_dpid)
                     match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
                                             ip_proto=6,
                                             ipv4_src=src_ip,
@@ -134,8 +134,8 @@ class L2SPF(app_manager.RyuApp):
                                             tcp_src=src_port,
                                             tcp_dst=dst_port)
                     actions = [parser.OFPActionOutput(dst_host_port)]
-                    self.add_flow(datapath, 20, match, actions)
-                    self.send_packet_out(datapath, msg, actions)
+                    self.install_flow_rule_in_switch(datapath, 20, match, actions)
+                    self.packet_exit_handle(datapath, msg, actions)
                     return 
 
                 try:
@@ -149,20 +149,20 @@ class L2SPF(app_manager.RyuApp):
                     self.install_path_flows(selected_path, src_mac, dst_mac, src_ip, dst_ip, src_port, dst_port, in_port, dst_host_port)
 
                     first_hop_port = self.graph[src_dpid][selected_path[1]]['port']
-                    self.send_packet_out(datapath, msg, [parser.OFPActionOutput(first_hop_port)])
+                    self.packet_exit_handle(datapath, msg, [parser.OFPActionOutput(first_hop_port)])
 
                 except nx.NetworkXNoPath:
                     self.logger.warning("No path from %s to %s found in graph. Flooding.", src_dpid, dst_dpid)
-                    self.flood_packet(datapath, msg)
+                    self.flood_packet_instruction(datapath, msg)
             else:
                 self.logger.info("Destination %s unknown. Flooding packet.", dst_mac)
-                self.flood_packet(datapath, msg)
+                self.flood_packet_instruction(datapath, msg)
         
         elif dst_mac not in self.mac_to_port:
             self.logger.debug("Destination %s unknown (Non-IP). Flooding packet.", dst_mac)
-            self.flood_packet(datapath, msg)
+            self.flood_packet_instruction(datapath, msg)
 
-    def add_flow(self, datapath, priority, match, actions, idle_timeout=10, hard_timeout=0):
+    def install_flow_rule_in_switch(self, datapath, priority, match, actions, idle_timeout=10, hard_timeout=0):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
         inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, actions)]
@@ -176,7 +176,7 @@ class L2SPF(app_manager.RyuApp):
             return random.choice(routes)
         return routes[0]
 
-    def flood_packet(self, datapath, msg):
+    def flood_packet_instruction(self, datapath, msg):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
         in_port = msg.match.get('in_port')
@@ -189,7 +189,7 @@ class L2SPF(app_manager.RyuApp):
                                   data=msg.data)
         datapath.send_msg(out)
 
-    def send_packet_out(self, datapath, msg, actions):
+    def packet_exit_handle(self, datapath, msg, actions):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
         in_port = msg.match.get('in_port', ofproto.OFPP_CONTROLLER)
@@ -217,7 +217,7 @@ class L2SPF(app_manager.RyuApp):
                                         tcp_src=src_port,
                                         tcp_dst=dst_port)
                 actions = [parser.OFPActionOutput(out_port)]
-                self.add_flow(dp, 20, match, actions)
+                self.install_flow_rule_in_switch(dp, 20, match, actions)
         
         dst_dp = self.switches.dps.get(path[-1])
         if dst_dp:
@@ -229,7 +229,7 @@ class L2SPF(app_manager.RyuApp):
                                     tcp_src=src_port,
                                     tcp_dst=dst_port)
             actions = [parser.OFPActionOutput(dst_host_port)]
-            self.add_flow(dst_dp, 20, match, actions)
+            self.install_flow_rule_in_switch(dst_dp, 20, match, actions)
 
         self.logger.info("Installing REVERSE path flows for %s:%s <- %s:%s", src_ip, src_port, dst_ip, dst_port)
         reverse_path = list(reversed(path))
@@ -247,7 +247,7 @@ class L2SPF(app_manager.RyuApp):
                                         tcp_src=dst_port,
                                         tcp_dst=src_port)
                 actions = [parser.OFPActionOutput(out_port)]
-                self.add_flow(dp, 20, match, actions)
+                self.install_flow_rule_in_switch(dp, 20, match, actions)
 
         src_dp = self.switches.dps.get(reverse_path[-1])
         if src_dp:
@@ -259,4 +259,4 @@ class L2SPF(app_manager.RyuApp):
                                     tcp_src=dst_port,
                                     tcp_dst=src_port)
             actions = [parser.OFPActionOutput(src_host_port)]
-            self.add_flow(src_dp, 20, match, actions)
+            self.install_flow_rule_in_switch(src_dp, 20, match, actions)
