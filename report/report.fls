@@ -180,10 +180,11 @@ INPUT /home/arpit/.miktex/texmfs/install/fonts/tfm/public/cm/cmr17.tfm
 INPUT /home/arpit/.miktex/texmfs/install/fonts/tfm/public/cm/cmbx12.tfm
 INPUT /home/arpit/.miktex/texmfs/install/fonts/tfm/public/cm/cmtt12.tfm
 INPUT /home/arpit/.miktex/texmfs/install/fonts/tfm/public/cm/cmbx12.tfm
+INPUT /home/arpit/.miktex/texmfs/install/fonts/tfm/public/cm/cmtt10.tfm
+INPUT /home/arpit/.miktex/texmfs/install/fonts/tfm/public/cm/cmr6.tfm
 INPUT /home/arpit/.miktex/texmfs/data/fonts/map/pdftex/pdftex.map
 INPUT /home/arpit/.miktex/texmfs/install/fonts/tfm/jknappen/ec/tcrm1200.tfm
 INPUT /home/arpit/.miktex/texmfs/install/fonts/tfm/public/cm/cmr8.tfm
-INPUT /home/arpit/.miktex/texmfs/install/fonts/tfm/public/cm/cmr6.tfm
 INPUT /home/arpit/.miktex/texmfs/install/fonts/tfm/public/cm/cmmi12.tfm
 INPUT /home/arpit/.miktex/texmfs/install/fonts/tfm/public/cm/cmmi8.tfm
 INPUT /home/arpit/.miktex/texmfs/install/fonts/tfm/public/cm/cmmi6.tfm
@@ -294,7 +295,11 @@ INPUT /home/arpit/.miktex/texmfs/install/fonts/type1/public/amsfonts/cm/cmmi12.p
 INPUT /home/arpit/.miktex/texmfs/install/fonts/type1/public/amsfonts/cm/cmmi12.pfb
 INPUT /home/arpit/.miktex/texmfs/install/fonts/type1/public/amsfonts/cm/cmr12.pfb
 INPUT /home/arpit/.miktex/texmfs/install/fonts/type1/public/amsfonts/cm/cmr12.pfb
+INPUT /home/arpit/.miktex/texmfs/install/fonts/type1/public/amsfonts/cm/cmr6.pfb
+INPUT /home/arpit/.miktex/texmfs/install/fonts/type1/public/amsfonts/cm/cmr6.pfb
 INPUT /home/arpit/.miktex/texmfs/install/fonts/type1/public/amsfonts/cm/cmsy10.pfb
 INPUT /home/arpit/.miktex/texmfs/install/fonts/type1/public/amsfonts/cm/cmsy10.pfb
+INPUT /home/arpit/.miktex/texmfs/install/fonts/type1/public/amsfonts/cm/cmtt10.pfb
+INPUT /home/arpit/.miktex/texmfs/install/fonts/type1/public/amsfonts/cm/cmtt10.pfb
 INPUT /home/arpit/.miktex/texmfs/install/fonts/type1/public/amsfonts/cm/cmtt12.pfb
 INPUT /home/arpit/.miktex/texmfs/install/fonts/type1/public/amsfonts/cm/cmtt12.pfb
